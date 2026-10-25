@@ -1,0 +1,113 @@
+{
+  "purpose": "試作専用。正式な人物・保存方式は未決定",
+  "initial_step": 0,
+  "locations": [
+    "plaza",
+    "shop",
+    "home"
+  ],
+  "residents": [
+    {
+      "id": "A",
+      "personality": [
+        "約束を重視"
+      ],
+      "goals": [
+        "祭りを成功させる"
+      ],
+      "routine": {
+        "morning": "plaza"
+      },
+      "memory_ids": [
+        "m1"
+      ]
+    },
+    {
+      "id": "B",
+      "personality": [
+        "拒絶に慎重"
+      ],
+      "goals": [
+        "店番と祭りへの協力を両立"
+      ],
+      "routine": {
+        "noon": "shop"
+      },
+      "memory_ids": [
+        "m2"
+      ]
+    },
+    {
+      "id": "C",
+      "personality": [
+        "秘密を守りたい"
+      ],
+      "goals": [
+        "AとBの協力を助ける"
+      ],
+      "routine": {
+        "morning": "shop",
+        "noon": "plaza"
+      },
+      "memory_ids": [
+        "m3"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "e1",
+      "step": -2,
+      "type": "missed_preparation",
+      "observers": [
+        "A",
+        "B"
+      ],
+      "fact": "Bは昨年の準備に参加しなかった"
+    },
+    {
+      "id": "e2",
+      "step": -1,
+      "type": "explanation_shared",
+      "observers": [
+        "B",
+        "C"
+      ],
+      "fact": "Bは急な家族の用事で準備に参加できなかった"
+    }
+  ],
+  "memories": [
+    {
+      "id": "m1",
+      "owner": "A",
+      "source_event_id": "e1",
+      "acquired_step": -2,
+      "source": "observation",
+      "interpretation": "Bは約束を軽く考えているのかもしれない"
+    },
+    {
+      "id": "m2",
+      "owner": "B",
+      "source_event_id": "e2",
+      "acquired_step": -1,
+      "source": "experience",
+      "interpretation": "事情をAに説明できていない"
+    },
+    {
+      "id": "m3",
+      "owner": "C",
+      "source_event_id": "e2",
+      "acquired_step": -1,
+      "source": "B",
+      "interpretation": "事情を知っているが勝手に明かしてよいか迷う"
+    }
+  ],
+  "allowed_action_types": [
+    "move",
+    "work",
+    "invite",
+    "consult",
+    "tell",
+    "continue_routine"
+  ]
+}

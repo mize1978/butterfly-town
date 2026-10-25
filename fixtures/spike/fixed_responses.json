@@ -1,0 +1,33 @@
+{
+  "purpose": "試作専用の固定応答。実LLMの代わりに、本人が知る事実（fact_key）の条件だけで行動案を返す",
+  "rules": [
+    {
+      "id": "A_knows_absence_and_reason",
+      "actor": "A",
+      "scene": "festival_prep",
+      "requires_known": ["e1", "e2"],
+      "response": {"actor": "A", "action_type": "invite", "target": "B", "params": {"task": "setup"}}
+    },
+    {
+      "id": "A_knows_absence_only",
+      "actor": "A",
+      "scene": "festival_prep",
+      "requires_known": ["e1"],
+      "requires_unknown": ["e2"],
+      "response": {"actor": "A", "action_type": "consult", "target": "C", "params": {"about": "B"}}
+    },
+    {
+      "id": "A_default",
+      "actor": "A",
+      "scene": "festival_prep",
+      "response": {"actor": "A", "action_type": "continue_routine", "target": null, "params": {}}
+    },
+    {
+      "id": "C_knows_reason",
+      "actor": "C",
+      "scene": "festival_prep",
+      "requires_known": ["e2"],
+      "response": {"actor": "C", "action_type": "tell", "target": "A", "params": {"fact_key": "e2"}}
+    }
+  ]
+}
