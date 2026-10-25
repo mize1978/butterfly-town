@@ -1,0 +1,191 @@
+# Spike 01 テスト証跡（2026-10-25、docker compose / PostgreSQL 17.11）
+# 生成: 実装担当が一時変更→テスト実行→元に戻す（cmpで一致確認）を各ケースで行った記録。
+# - mutant: 検証を一時的に外した変更。該当テストが失敗すれば、そのテストが検証として機能している。
+# - 「一時差分」の - が元のコード、+ が一時変更。
+# - 終了コードは sh -c の最後のコマンドのもの（残存確認の runner を後に実行するケースでは 0 になる）。
+# - 失敗詳細はバックトレースを省略して抜粋。
+
+=== mutant: 伝える本人が知っているかのチェックを削除
+--- 一時差分:
+-    raise InvalidAction, "actor does not know fact" unless @run.memories.known_at(c["step"]).exists?(owner: c["actor"], fact_key: c["fact_key"])
+--- コマンド: docker compose run --rm  web sh -c 'bin/rails test'
+Failure:
+InformationPropagationTest#test_a_memory_acquired_at_a_later_step_is_neither_in_the_context_nor_tellable_yet [test/services/information_propagation_test.rb:23]:
+[FixedActionProcessor::InvalidAction] exception expected, not
+Class: <ActiveRecord::RecordNotFound>
+Message: <"Couldn't find Memory with [WHERE \"memories\".\"simulation_run_id\" = $1 AND \"memories\".\"acquired_step\" <= $2 AND \"memories\".\"owner\" = $3 AND \"memories\".\"fact_key\" = $4]">
+test/services/information_propagation_test.rb:23:in 'block in InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:23:in 'InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:60:in 'block in <class:InformationPropagationTest>'
+Failure:
+InformationPropagationTest#test_tell_is_rejected_for_unknown,_missing_or_self_targets_and_unknown_facts [test/services/information_propagation_test.rb:23]:
+[FixedActionProcessor::InvalidAction] exception expected, not
+Class: <ActiveRecord::RecordNotFound>
+Message: <"Couldn't find Memory with [WHERE \"memories\".\"simulation_run_id\" = $1 AND \"memories\".\"acquired_step\" <= $2 AND \"memories\".\"owner\" = $3 AND \"memories\".\"fact_key\" = $4]">
+test/services/information_propagation_test.rb:23:in 'block in InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:23:in 'InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:77:in 'block in <class:InformationPropagationTest>'
+Failure:
+InformationPropagationTest#test_A_cannot_pass_on_the_secret_before_learning_it [test/services/information_propagation_test.rb:23]:
+[FixedActionProcessor::InvalidAction] exception expected, not
+Class: <ActiveRecord::RecordNotFound>
+Message: <"Couldn't find Memory with [WHERE \"memories\".\"simulation_run_id\" = $1 AND \"memories\".\"acquired_step\" <= $2 AND \"memories\".\"owner\" = $3 AND \"memories\".\"fact_key\" = $4]">
+test/services/information_propagation_test.rb:23:in 'block in InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:23:in 'InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:38:in 'block in <class:InformationPropagationTest>'
+26 runs, 92 assertions, 3 failures, 0 errors, 0 skips
+--- 終了コード: 1 / 所要: 3秒
+--- 復元確認: OK (cmp一致)
+
+=== mutant: 受け手が既に知っているかのチェックを削除
+--- 一時差分:
+-    raise InvalidAction, "target already knows fact" if @run.memories.exists?(owner: c["target"], fact_key: c["fact_key"])
+--- コマンド: docker compose run --rm  web sh -c 'bin/rails test'
+Failure:
+InformationPropagationTest#test_repeating_a_tell_does_not_duplicate_the_memory;_a_new_id_for_the_same_fact_is_rejected [test/services/information_propagation_test.rb:23]:
+[FixedActionProcessor::InvalidAction] exception expected, not
+Class: <ActiveRecord::RecordNotUnique>
+Message: <"PG::UniqueViolation: ERROR:  duplicate key value violates unique constraint \"index_memories_on_simulation_run_id_and_owner_and_fact_key\"\nDETAIL:  Key (simulation_run_id, owner, fact_key)=(76, A, e2) already exists.\n">
+test/services/information_propagation_test.rb:23:in 'block in InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:23:in 'InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:86:in 'block in <class:InformationPropagationTest>'
+Error:
+ConcurrentProcessingTest#test_the_same_fact_told_concurrently_creates_one_memory:
+ActiveRecord::RecordNotUnique: PG::UniqueViolation: ERROR:  duplicate key value violates unique constraint "index_memories_on_simulation_run_id_and_owner_and_fact_key"
+    test/services/concurrent_processing_test.rb:36:in 'block (3 levels) in ConcurrentProcessingTest#run_concurrently'
+    test/services/concurrent_processing_test.rb:31:in 'block (2 levels) in ConcurrentProcessingTest#run_concurrently'
+26 runs, 96 assertions, 1 failures, 1 errors, 0 skips
+--- 終了コード: 1 / 所要: 3秒
+--- 復元確認: OK (cmp一致)
+
+=== mutant: 承諾でも進捗を加算
+--- 一時差分:
+-      @run.update!(progress: @run.progress + 1) if command["kind"] == "worked"
++      @run.update!(progress: @run.progress + 1) if %w[worked accepted].include?(command["kind"])
+--- コマンド: docker compose run --rm  web sh -c 'bin/rails test'
+Failure:
+ConcurrentProcessingTest#test_work_commands_with_different_ids_sent_concurrently_advance_preparation_once [test/services/concurrent_processing_test.rb:89]:
+Expected: 1
+  Actual: 0
+Failure:
+ConcurrentProcessingTest#test_the_same_work_command_sent_concurrently_is_applied_once [test/services/concurrent_processing_test.rb:79]:
++[FixedActionProcessor::InvalidAction]
+Failure:
+FixedActionProcessorTest#test_event_insert_rolls_back_when_progress_update_fails [test/services/fixed_action_processor_test.rb:94]:
+[RuntimeError] exception expected, not
+Class: <FixedActionProcessor::InvalidAction>
+Message: <"task already complete">
+test/services/fixed_action_processor_test.rb:94:in 'block (2 levels) in <class:FixedActionProcessorTest>'
+test/services/fixed_action_processor_test.rb:94:in 'block in <class:FixedActionProcessorTest>'
+Error:
+FixedActionProcessorTest#test_work_cannot_be_counted_twice_even_with_a_new_command_id:
+FixedActionProcessor::InvalidAction: task already complete
+    test/services/fixed_action_processor_test.rb:67:in 'block in <class:FixedActionProcessorTest>'
+Failure:
+FixedActionProcessorTest#test_invitation_acceptance_and_work_persist_separately;_only_work_advances_preparation [test/services/fixed_action_processor_test.rb:31]:
+Expected: 0
+  Actual: 1
+Failure:
+InformationPropagationTest#test_after_the_tell,_A's_proposal_changes_and_the_chain_advances_preparation_only_on_work [test/services/information_propagation_test.rb:107]:
+Expected: 0
+  Actual: 1
+26 runs, 83 assertions, 5 failures, 1 errors, 0 skips
+--- 終了コード: 1 / 所要: 2秒
+--- 復元確認: OK (cmp一致)
+
+=== mutant: runのロックを削除（トランザクションのみ）
+--- 一時差分:
+-    @run.with_lock do
++    @run.transaction do
+--- コマンド: docker compose run --rm  web sh -c 'bin/rails test test/services/concurrent_processing_test.rb'
+Error:
+ConcurrentProcessingTest#test_the_same_fact_told_concurrently_creates_one_memory:
+ActiveRecord::RecordNotUnique: PG::UniqueViolation: ERROR:  duplicate key value violates unique constraint "index_memories_on_simulation_run_id_and_owner_and_fact_key"
+    test/services/concurrent_processing_test.rb:36:in 'block (3 levels) in ConcurrentProcessingTest#run_concurrently'
+    test/services/concurrent_processing_test.rb:31:in 'block (2 levels) in ConcurrentProcessingTest#run_concurrently'
+Failure:
+ConcurrentProcessingTest#test_work_commands_with_different_ids_sent_concurrently_advance_preparation_once [test/services/concurrent_processing_test.rb:89]:
+Expected: 1
+  Actual: 4
+Error:
+ConcurrentProcessingTest#test_the_same_work_command_sent_concurrently_is_applied_once:
+ActiveRecord::RecordNotUnique: PG::UniqueViolation: ERROR:  duplicate key value violates unique constraint "index_confirmed_events_on_simulation_run_id_and_command_id"
+    test/services/concurrent_processing_test.rb:36:in 'block (3 levels) in ConcurrentProcessingTest#run_concurrently'
+    test/services/concurrent_processing_test.rb:31:in 'block (2 levels) in ConcurrentProcessingTest#run_concurrently'
+3 runs, 1 assertions, 1 failures, 2 errors, 0 skips
+--- 終了コード: 1 / 所要: 2秒
+--- 復元確認: OK (cmp一致)
+
+=== mutant: 伝達資格で記憶の取得時点を無視
+--- 一時差分:
+-    raise InvalidAction, "actor does not know fact" unless @run.memories.known_at(c["step"]).exists?(owner: c["actor"], fact_key: c["fact_key"])
++    raise InvalidAction, "actor does not know fact" unless @run.memories.exists?(owner: c["actor"], fact_key: c["fact_key"])
+--- コマンド: docker compose run --rm  web sh -c 'bin/rails test'
+Failure:
+InformationPropagationTest#test_a_memory_acquired_at_a_later_step_is_neither_in_the_context_nor_tellable_yet [test/services/information_propagation_test.rb:23]:
+[FixedActionProcessor::InvalidAction] exception expected, not
+Class: <ActiveRecord::RecordNotFound>
+Message: <"Couldn't find Memory with [WHERE \"memories\".\"simulation_run_id\" = $1 AND \"memories\".\"acquired_step\" <= $2 AND \"memories\".\"owner\" = $3 AND \"memories\".\"fact_key\" = $4]">
+test/services/information_propagation_test.rb:23:in 'block in InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:23:in 'InformationPropagationTest#reject_without_change'
+test/services/information_propagation_test.rb:60:in 'block in <class:InformationPropagationTest>'
+26 runs, 96 assertions, 1 failures, 0 errors, 0 skips
+--- 終了コード: 1 / 所要: 3秒
+--- 復元確認: OK (cmp一致)
+
+=== 異常系: 接続プール2（4スレッド中2つが接続を得られない）
+--- 一時差分:
+(なし)
+--- コマンド: docker compose run --rm -e RAILS_MAX_THREADS=2 web sh -c 'bin/rails test test/services/concurrent_processing_test.rb; bin/rails runner -e test "p leftovers: [SimulationRun.count, ConfirmedEvent.count, Memory.count]"'
+Failure:
+ConcurrentProcessingTest#test_the_same_fact_told_concurrently_creates_one_memory [test/services/concurrent_processing_test.rb:47]:
+threads failed to get ready: [true, true, false, false]
+Failure:
+ConcurrentProcessingTest#test_work_commands_with_different_ids_sent_concurrently_advance_preparation_once [test/services/concurrent_processing_test.rb:47]:
+threads failed to get ready: [true, true, false, false]
+Failure:
+ConcurrentProcessingTest#test_the_same_work_command_sent_concurrently_is_applied_once [test/services/concurrent_processing_test.rb:47]:
+threads failed to get ready: [true, true, false, false]
+3 runs, 3 assertions, 3 failures, 0 errors, 0 skips
+{leftovers: [0, 0, 0]}
+--- 終了コード: 0 / 所要: 33秒
+--- 復元確認: OK (cmp一致)
+
+=== 異常系: 処理が待機期限を超える→kill経路（処理開始前に30秒停止）
+--- 一時差分:
++    sleep 30 if ENV["SPIKE_SLOW"]
++    warn "POOL #{ActiveRecord::Base.connection_pool.stat.slice(:busy, :dead).inspect} threads=#{Thread.list.size}"
++        warn "EXITED #{Thread.current.object_id}"
+-        t.join(WAIT_SECONDS) || t.kill.join
++        t.join(WAIT_SECONDS) || (warn("KILL #{t.object_id}"); t.kill.join; warn("KILLED_AND_JOINED #{t.object_id} alive=#{t.alive?}"))
+--- コマンド: docker compose run --rm  web sh -c 'SPIKE_SLOW=1 bin/rails test test/services/concurrent_processing_test.rb -n /same_work_command/; bin/rails runner -e test "p leftovers: [SimulationRun.count, ConfirmedEvent.count, Memory.count]"'
+KILL 3992
+EXITED 3992
+KILLED_AND_JOINED 3992 alive=false
+KILL 4000
+EXITED 4000
+KILLED_AND_JOINED 4000 alive=false
+EXITED 4032
+EXITED 4016
+POOL {busy: 0, dead: 0} threads=2
+Failure:
+ConcurrentProcessingTest#test_the_same_work_command_sent_concurrently_is_applied_once [test/services/concurrent_processing_test.rb:52]:
+thread did not finish in time
+1 runs, 1 assertions, 1 failures, 0 errors, 0 skips
+{leftovers: [0, 0, 0]}
+--- 終了コード: 0 / 所要: 94秒
+--- 復元確認: OK (cmp一致)
+
+=== 通常: 全テスト + 並行テスト5回 + 残存確認
+--- 一時差分:
+(なし)
+--- コマンド: docker compose run --rm  web sh -c 'RAILS_ENV=test bin/rails db:reset >/dev/null 2>&1; bin/rails test; for i in 1 2 3 4 5; do bin/rails test test/services/concurrent_processing_test.rb | tail -1; done; bin/rails runner -e test "p leftovers: [SimulationRun.count, ConfirmedEvent.count, Memory.count]"'
+26 runs, 100 assertions, 0 failures, 0 errors, 0 skips
+3 runs, 11 assertions, 0 failures, 0 errors, 0 skips
+3 runs, 11 assertions, 0 failures, 0 errors, 0 skips
+3 runs, 11 assertions, 0 failures, 0 errors, 0 skips
+3 runs, 11 assertions, 0 failures, 0 errors, 0 skips
+3 runs, 11 assertions, 0 failures, 0 errors, 0 skips
+{leftovers: [0, 0, 0]}
+--- 終了コード: 0 / 所要: 10秒
+--- 復元確認: OK (cmp一致)
