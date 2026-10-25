@@ -1,0 +1,36 @@
+# 開発・テスト用。ホストの5432（PostgreSQL）と3000（別プロジェクト）は使用中のため、
+# DBはホストへ公開せず、Railsは127.0.0.1:3100にだけ公開する。
+services:
+  db:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    # fixtures/ を ../fixtures として参照するため、リポジトリ全体をマウントする
+    volumes:
+      - .:/app
+    working_dir: /app/backend
+    environment:
+      DB_HOST: db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3100:3000"
+    command: bin/rails server -b 0.0.0.0
+
+volumes:
+  db_data:
