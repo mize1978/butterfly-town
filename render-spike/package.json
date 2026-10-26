@@ -1,0 +1,28 @@
+{
+  "name": "butterfly-town-render-spike",
+  "private": true,
+  "description": "描画Spike：React + Phaser 4 と Canvas 2D の比較（固定データ・AI未接続）",
+  "type": "module",
+  "engines": { "node": "26.5.0" },
+  "scripts": {
+    "art": "node scripts/copy-art.mjs",
+    "dev": "vite --host 127.0.0.1 --port 4190 --strictPort",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "node e2e/browser-check.mjs"
+  },
+  "dependencies": {
+    "phaser": "4.2.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}

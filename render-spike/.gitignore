@@ -1,0 +1,5 @@
+node_modules/
+dist/
+# 権利条件が未確認の試作素材はリポジトリに入れない（scripts/copy-art.mjs で ~/outputs から複製）
+public/art/
+e2e/out/
