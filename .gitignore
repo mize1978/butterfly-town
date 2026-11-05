@@ -1,0 +1,9 @@
+/backend/config/master.key
+/backend/log/*
+!/backend/log/.keep
+/backend/tmp/*
+!/backend/tmp/.keep
+/backend/storage/*
+!/backend/storage/.keep
+/backend/.bundle/
+/frontend/node_modules/

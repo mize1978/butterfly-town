@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+ruby "3.4.10"
+gem "rails", "8.1.4"
+gem "pg", "1.7.0"
+gem "puma", "8.0.2"
+gem "minitest", "5.27.0", group: :test

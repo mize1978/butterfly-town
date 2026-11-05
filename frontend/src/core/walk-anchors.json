@@ -1,0 +1,492 @@
+{
+  "girl-walk-base": {
+    "image": "girl-walk-base.png",
+    "canvasSize": [
+      1254,
+      1254
+    ],
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          189,
+          10,
+          350,
+          610
+        ],
+        "groundAnchor": [
+          383.6,
+          620
+        ]
+      },
+      {
+        "index": 1,
+        "sourceRect": [
+          779,
+          9,
+          288,
+          608
+        ],
+        "groundAnchor": [
+          943.9,
+          617
+        ]
+      },
+      {
+        "index": 2,
+        "sourceRect": [
+          205,
+          632,
+          355,
+          599
+        ],
+        "groundAnchor": [
+          398.4,
+          1231
+        ]
+      },
+      {
+        "index": 3,
+        "sourceRect": [
+          774,
+          632,
+          299,
+          604
+        ],
+        "groundAnchor": [
+          945.3,
+          1236
+        ]
+      }
+    ]
+  },
+  "girl-walk-se-base": {
+    "image": "girl-walk-se-base.png",
+    "canvasSize": [
+      1536,
+      1024
+    ],
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          103,
+          6,
+          190,
+          491
+        ],
+        "groundAnchor": [
+          211.1,
+          497
+        ]
+      },
+      {
+        "index": 1,
+        "sourceRect": [
+          500,
+          6,
+          197,
+          494
+        ],
+        "groundAnchor": [
+          606.6,
+          500
+        ]
+      },
+      {
+        "index": 2,
+        "sourceRect": [
+          872,
+          5,
+          186,
+          499
+        ],
+        "groundAnchor": [
+          975.3,
+          504
+        ]
+      },
+      {
+        "index": 3,
+        "sourceRect": [
+          1245,
+          5,
+          216,
+          495
+        ],
+        "groundAnchor": [
+          1357.5,
+          500
+        ]
+      },
+      {
+        "index": 4,
+        "sourceRect": [
+          75,
+          519,
+          270,
+          493
+        ],
+        "groundAnchor": [
+          210.3,
+          1012
+        ]
+      },
+      {
+        "index": 5,
+        "sourceRect": [
+          473,
+          519,
+          236,
+          490
+        ],
+        "groundAnchor": [
+          601.1,
+          1009
+        ]
+      },
+      {
+        "index": 6,
+        "sourceRect": [
+          890,
+          519,
+          166,
+          496
+        ],
+        "groundAnchor": [
+          972.4,
+          1015
+        ]
+      },
+      {
+        "index": 7,
+        "sourceRect": [
+          1268,
+          519,
+          196,
+          496
+        ],
+        "groundAnchor": [
+          1359,
+          1015
+        ]
+      }
+    ]
+  },
+  "girl-walk-ne-base": {
+    "image": "girl-walk-ne-base.png",
+    "canvasSize": [
+      1536,
+      1024
+    ],
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          86,
+          10,
+          234,
+          492
+        ],
+        "groundAnchor": [
+          222.4,
+          502
+        ]
+      },
+      {
+        "index": 1,
+        "sourceRect": [
+          500,
+          7,
+          187,
+          495
+        ],
+        "groundAnchor": [
+          598.2,
+          502
+        ]
+      },
+      {
+        "index": 2,
+        "sourceRect": [
+          882,
+          9,
+          174,
+          489
+        ],
+        "groundAnchor": [
+          975.7,
+          498
+        ]
+      },
+      {
+        "index": 3,
+        "sourceRect": [
+          1222,
+          8,
+          256,
+          494
+        ],
+        "groundAnchor": [
+          1372.9,
+          502
+        ]
+      },
+      {
+        "index": 4,
+        "sourceRect": [
+          67,
+          520,
+          262,
+          488
+        ],
+        "groundAnchor": [
+          193.5,
+          1008
+        ]
+      },
+      {
+        "index": 5,
+        "sourceRect": [
+          495,
+          519,
+          200,
+          486
+        ],
+        "groundAnchor": [
+          598.4,
+          1005
+        ]
+      },
+      {
+        "index": 6,
+        "sourceRect": [
+          883,
+          517,
+          159,
+          490
+        ],
+        "groundAnchor": [
+          970.4,
+          1007
+        ]
+      },
+      {
+        "index": 7,
+        "sourceRect": [
+          1243,
+          521,
+          190,
+          487
+        ],
+        "groundAnchor": [
+          1343.4,
+          1008
+        ]
+      }
+    ]
+  },
+  "girl-walk-s-base": {
+    "image": "girl-walk-s-base.png",
+    "canvasSize": [
+      1536,
+      1024
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-walk-s-ivory-6.png（registration.json の値をそのまま写した。sha256 e272f0d2557cd0dea49a31a88151ee38f726ddc244bcbe85bfe7148f98c79190）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          182,
+          9,
+          174,
+          487
+        ],
+        "groundAnchor": [
+          271.5,
+          496
+        ]
+      },
+      {
+        "index": 1,
+        "sourceRect": [
+          695,
+          9,
+          158,
+          485
+        ],
+        "groundAnchor": [
+          773.63,
+          494
+        ]
+      },
+      {
+        "index": 2,
+        "sourceRect": [
+          1205,
+          9,
+          157,
+          484
+        ],
+        "groundAnchor": [
+          1283.03,
+          493
+        ]
+      },
+      {
+        "index": 3,
+        "sourceRect": [
+          182,
+          523,
+          163,
+          485
+        ],
+        "groundAnchor": [
+          263.67,
+          1008
+        ]
+      },
+      {
+        "index": 4,
+        "sourceRect": [
+          691,
+          524,
+          161,
+          483
+        ],
+        "groundAnchor": [
+          773.14,
+          1007
+        ]
+      },
+      {
+        "index": 5,
+        "sourceRect": [
+          1206,
+          524,
+          155,
+          469
+        ],
+        "groundAnchor": [
+          1285.18,
+          993
+        ]
+      }
+    ]
+  },
+  "girl-idle-s-base": {
+    "image": "girl-idle-s-base.png",
+    "canvasSize": [
+      1024,
+      1536
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-idle-s-ivory.png（registration.json の値をそのまま写した。sha256 d704f2c71b26a56ff159588517ad76744654ef8036110da595ed2f00e5d325c9）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          250,
+          25,
+          523,
+          1496
+        ],
+        "groundAnchor": [
+          512.27,
+          1520
+        ]
+      }
+    ]
+  },
+  "girl-idle-se-base": {
+    "image": "girl-idle-se-base.png",
+    "canvasSize": [
+      1024,
+      1536
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-idle-se-ivory.png（registration.json の値をそのまま写した。sha256 367bca7fa43e0523ab3720622b1a2174283ea70d3d3f56bd2bba17f7501ab256）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          255,
+          28,
+          498,
+          1482
+        ],
+        "groundAnchor": [
+          515.17,
+          1510
+        ]
+      }
+    ]
+  },
+  "girl-idle-e-base": {
+    "image": "girl-idle-e-base.png",
+    "canvasSize": [
+      1024,
+      1536
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-idle-e-ivory.png（registration.json の値をそのまま写した。sha256 e3adf8da4d03b7c742121ec321f8ebfac88c2d7cf538b1d816776fe25a385da2）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          279,
+          28,
+          444,
+          1475
+        ],
+        "groundAnchor": [
+          526.4,
+          1503
+        ]
+      }
+    ]
+  },
+  "girl-idle-ne-base": {
+    "image": "girl-idle-ne-base.png",
+    "canvasSize": [
+      1024,
+      1536
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-idle-ne-ivory.png（registration.json の値をそのまま写した。sha256 ec88e541150f4c161843a8925b054958ed83e77a93967e8cbb2ec445591c3b26）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          262,
+          23,
+          501,
+          1481
+        ],
+        "groundAnchor": [
+          510.19,
+          1504
+        ]
+      }
+    ]
+  },
+  "girl-idle-n-base": {
+    "image": "girl-idle-n-base.png",
+    "canvasSize": [
+      1024,
+      1536
+    ],
+    "source": "~/outputs/butterfly-direction-study-01/assets/girl-idle-n-ivory.png（registration.json の値をそのまま写した。sha256 beddadda07bf4741b602738bcf0e9a19ea46c9fbbbf388a8adbe242c3156cbce）",
+    "frames": [
+      {
+        "index": 0,
+        "sourceRect": [
+          251,
+          20,
+          511,
+          1490
+        ],
+        "groundAnchor": [
+          504.17,
+          1510
+        ]
+      }
+    ]
+  }
+}
