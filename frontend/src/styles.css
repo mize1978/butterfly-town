@@ -35,6 +35,9 @@ p { margin: 0; }
 /* S01 トップ：街の絵を画面いっぱいに敷き、中央のカードにタイトルと開始ボタンをまとめる */
 .title-screen { position: relative; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; overflow: hidden; background: var(--forest); }
 .title-visual { position: absolute; inset: 0; background: var(--field) url("/art/town.png") center / cover no-repeat; }
+/* 川だけを描くキャンバス。背景と同じく中央寄せ・cover で伸び縮みさせ、絵とずれないようにする */
+.title-water { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; }
+.water-toggle { position: absolute; right: 16px; bottom: 16px; background: rgba(251, 247, 236, .9); }
 .title-visual::after { content: ""; position: absolute; inset: 0;
   background: radial-gradient(ellipse at center, rgba(37, 75, 67, .05) 30%, rgba(37, 75, 67, .55) 100%); }
 .title-card { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; align-items: stretch; gap: 12px; text-align: center;
