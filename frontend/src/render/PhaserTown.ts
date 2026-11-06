@@ -102,11 +102,11 @@ function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
     e.preventDefault();
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
-    s.sim.press(toWorld(e));
+    s.press(toWorld(e));
   };
-  const move = (e: PointerEvent) => { if (id === e.pointerId) s.sim.press(toWorld(e)); };
-  const up = (e: PointerEvent) => { if (id === e.pointerId) { id = null; s.sim.release(); } };
-  const cancelAll = () => { id = null; s.sim.release(); };
+  const move = (e: PointerEvent) => { if (id === e.pointerId) s.press(toWorld(e)); };
+  const up = (e: PointerEvent) => { if (id === e.pointerId) { id = null; s.release(); } };
+  const cancelAll = () => { id = null; s.release(); };
   const onVis = () => { if (document.hidden) cancelAll(); };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
@@ -134,7 +134,8 @@ export class PhaserTown {
       const scene = new TownScene();
       const game = new Phaser.Game({
         type: Phaser.AUTO, parent, width: session.view.w, height: session.view.h, backgroundColor: "#ece8dc",
-        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        // 中央寄せは外側の CSS（.world-host の flex）で行う。Phaser の autoCenter も使うと余白が二重につき、左にずれる
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.NO_CENTER },
         banner: false, audio: { noAudio: true }, scene: []
       });
       this.game = game;

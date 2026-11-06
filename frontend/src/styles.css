@@ -1,19 +1,129 @@
+/* 色は Figma「02_提出用・詳細画面と遷移」の画面と同じ（帯 #254b43・地 #fbf7ec・主ボタン #2c2c2c・補足 #6e7970・注記 #916637） */
 :root {
-  --forest: #244a45; --paper: #fff8e7; --ink: #263d36; --gold: #e8c16a; --clay: #b76a58; --bg: #ece8dc;
-  font-family: "Hiragino Sans", "Yu Gothic", system-ui, sans-serif; color: var(--ink); background: var(--bg);
+  --forest: #254b43; --paper: #fbf7ec; --cream: #fff9e9; --ink: #254b43; --muted: #6e7970; --note: #916637;
+  --dark: #2c2c2c; --on-dark: #f5f5f5; --line: #d9d6c8; --field: #e9ede2; --card: #f4e6ce; --gold: #f3d88f; --clay: #b76a58;
+  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif; color: var(--ink); background: var(--paper);
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: var(--bg); }
-button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid #c9bfa4; background: var(--paper); color: var(--ink); padding: 8px 14px; }
-h1 { font-family: Georgia, serif; font-weight: 600; margin: 0; font-size: 22px; }
+body { margin: 0; min-height: 100vh; background: var(--paper); }
+p { margin: 0; }
 
-.town-screen { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; height: 100vh; }
-.town-screen header { display: flex; align-items: baseline; gap: 12px; background: var(--forest); color: var(--paper); padding: 10px 16px; border-radius: 12px; }
-.town-name { font-size: 14px; opacity: .85; }
-.status { margin: auto; text-align: center; }
-.status.error { color: var(--clay); }
-.world-host { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; overflow: hidden; }
-.world-host canvas.world-canvas { touch-action: none; user-select: none; }
+.btn { font: inherit; font-size: 16px; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  padding: 10px 16px; min-height: 44px; }
+.btn:hover:not(:disabled) { border-color: var(--forest); }
+.btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.btn.primary { background: var(--dark); border-color: var(--dark); color: var(--on-dark); }
+.btn:disabled { cursor: not-allowed; background: #efede6; color: #8f948d; border-style: dashed; }
+.btn.wide { width: 100%; text-align: left; }
+
+/* 共通の枠：上の深緑の帯 */
+.frame { min-height: 100vh; display: flex; flex-direction: column; }
+.bar { display: flex; align-items: center; gap: 12px; background: var(--forest); color: var(--cream); padding: 10px 20px; min-height: 56px; }
+.brand { font-weight: 700; font-size: 22px; letter-spacing: .01em; }
+.bar-label { margin-left: auto; font-weight: 700; font-size: 15px; opacity: .9; }
+.bar .menu-button { background: var(--cream); color: var(--forest); border-color: var(--cream); font-weight: 700; }
+
+.page { width: 100%; max-width: 900px; margin: 0 auto; padding: 32px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+.lead { font-size: 30px; font-weight: 700; margin: 0; line-height: 1.35; }
+.lead-s { font-size: 19px; font-weight: 700; }
+.sub { color: var(--muted); font-size: 17px; }
+.note { color: var(--note); font-size: 14px; line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.actions .btn { min-width: 200px; }
+
+/* S01 トップ：街の絵を画面いっぱいに敷き、中央のカードにタイトルと開始ボタンをまとめる */
+.title-screen { position: relative; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; overflow: hidden; background: var(--forest); }
+.title-visual { position: absolute; inset: 0; background: var(--field) url("/art/town.png") center / cover no-repeat; }
+.title-visual::after { content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(37, 75, 67, .05) 30%, rgba(37, 75, 67, .55) 100%); }
+.title-card { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; align-items: stretch; gap: 12px; text-align: center;
+  background: rgba(251, 247, 236, .94); border: 1px solid rgba(255, 249, 233, .8); border-radius: 18px; padding: 28px 28px 22px;
+  box-shadow: 0 18px 50px rgba(20, 40, 35, .35); }
+.title-brand { font-size: 34px; font-weight: 700; color: var(--forest); letter-spacing: .01em; }
+.title-lead { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
+.title-sub { color: var(--muted); font-size: 15px; margin-bottom: 6px; word-break: keep-all; overflow-wrap: anywhere; }
+.btn.start { font-size: 18px; font-weight: 700; min-height: 54px; }
+.btn.ghost { background: transparent; }
+.btn.small { font-size: 14px; min-height: 36px; padding: 6px 10px; }
+.locked-block { display: grid; gap: 6px; }
+.locked { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.locked .btn { flex: 1 1 0; min-width: max-content; }
+.locked-note { color: var(--muted); font-size: 13px; }
+.title-card .locked-block { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* S25 遊び方 */
+.howto { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0; line-height: 1.6; }
+.howto dt { font-weight: 700; }
+.howto dd { margin: 0; }
+
+/* S04 着せ替え */
+.dress-grid { display: grid; grid-template-columns: minmax(200px, 300px) 1fr; gap: 24px; align-items: start; }
+.avatar { background: var(--field); border: 1px solid var(--line); border-radius: 12px; aspect-ratio: 2 / 3; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.avatar img { width: 100%; height: 100%; object-fit: contain; }
+.dress h2 { font-size: 22px; margin: 0 0 12px; }
+.outfit { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 2px solid var(--forest); background: #fff; margin-bottom: 10px; }
+.outfit-name { font-weight: 700; }
+.tag { font-size: 13px; background: var(--forest); color: var(--cream); padding: 2px 10px; border-radius: 999px; }
+
+/* S05 街・徒歩 */
+.town-frame { height: 100vh; height: 100dvh; min-height: 0; }
+.town-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 16px 12px; }
+/* 幅は「画面幅」と「残りの高さ×5/3」の小さい方（帯・情報・説明の分 約150px を引く） */
+.town-stage { --stage-w: min(100%, calc((100dvh - 150px) * 5 / 3)); width: var(--stage-w); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.town-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; }
+.town-name { font-weight: 700; }
+.badge { font-size: 13px; color: var(--note); border: 1px solid var(--note); border-radius: 999px; padding: 1px 10px; }
+.world-wrap { width: 100%; aspect-ratio: 5 / 3; min-width: 0; display: flex; }
+/* min-width/min-height を 0 にして、キャンバスの大きさで枠が広がらないようにする（Phaser の FIT は枠の大きさを測って縮める） */
+.world-host { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.world-host canvas.world-canvas { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 6px 20px rgba(37, 75, 67, .18); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .world-note { position: absolute; inset: auto 16px 45% 16px; text-align: center; }
 .world-note.error { color: var(--clay); }
-.hint { margin: 0; font-size: 13px; text-align: center; }
+.hint { font-size: 13px; text-align: center; color: var(--muted); }
+.status { margin: auto; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.status.error { color: var(--clay); }
+
+/* メニュー：街の上に重ねる。開いている間、街は止まっている */
+.menu-layer { position: absolute; inset: 0; background: rgba(37, 75, 67, .28); display: flex; justify-content: flex-end; align-items: flex-start; padding: 10px 16px; z-index: 10; }
+.menu-panel { width: min(360px, 100%); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 12px; border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .18); padding: 18px; display: flex; flex-direction: column; gap: 10px; line-height: 1.6; }
+.menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.menu-head h2 { margin: 0; font-size: 20px; }
+.paused { font-size: 13px; color: var(--muted); }
+.menu-panel .howto { grid-template-columns: 1fr; gap: 0; }
+.menu-panel .howto dd { margin-bottom: 8px; }
+
+@media (max-width: 640px) {
+  .bar { padding: 8px 16px; }
+  .brand { font-size: 18px; }
+  .bar-label { display: none; }
+  .bar .menu-button { margin-left: auto; }
+  .page { padding: 20px 16px 32px; gap: 14px; }
+  .lead { font-size: 21px; }
+  .title-brand { font-size: 28px; }
+  .title-card { padding: 22px 18px 18px; }
+  .actions .btn { flex: 1 1 100%; min-width: 0; }
+  .dress-grid { grid-template-columns: 1fr; }
+  .avatar { max-width: 220px; margin: 0 auto; width: 100%; }
+  .howto { grid-template-columns: 1fr; gap: 2px; }
+  .howto dd { margin-bottom: 8px; }
+  .town-main { padding: 8px 12px 10px; }
+  .menu-layer { padding: 8px; }
+  .menu-panel { width: 100%; }
+}
+
+/* 横向きのスマートフォンなど、高さが低い画面では帯と説明を詰めて街を広く見せる */
+@media (max-height: 480px) {
+  .bar { min-height: 44px; padding-block: 4px; }
+  .bar .btn { min-height: 36px; padding-block: 6px; }
+  .town-main { padding-block: 4px 6px; }
+  .town-stage { --stage-w: min(100%, calc((100dvh - 90px) * 5 / 3)); gap: 4px; }
+  .town-main .hint { display: none; }
+  .title-screen { padding-block: 10px; }
+  .title-card { gap: 8px; padding: 14px 20px 12px; }
+  .title-brand { font-size: 24px; }
+  .title-lead { font-size: 17px; }
+  .title-sub { font-size: 13px; margin-bottom: 0; }
+  .btn.start { min-height: 44px; font-size: 16px; }
+  .title-card .locked-block { margin-top: 2px; padding-top: 8px; }
+}

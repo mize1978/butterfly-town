@@ -1,42 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { fetchTown } from "../api/town";
-import type { Town } from "../core/world";
-import { Session } from "../game/session";
-import { GameView } from "./GameView";
+// 画面の切り替え。Figma「02_提出用・詳細画面と遷移」の S01 トップ → S04 着せ替え → S05 街・徒歩 と、S01 → S25 遊び方 の導線。
+// 認証（S02・S03）・保存（S14・S15）・つづきからはまだ作っていないので、押せないボタンと理由だけを示す
+import { useState } from "react";
+import { DressScreen } from "./DressScreen";
+import { HowToScreen } from "./HowToScreen";
+import { TitleScreen } from "./TitleScreen";
+import { TownScreen } from "./TownScreen";
 
-type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; town: Town };
+export type Screen = "title" | "howto" | "dress" | "town";
 
 export function App() {
-  const [load, setLoad] = useState<Load>({ status: "loading" });
-  const [attempt, setAttempt] = useState(0);
+  const [screen, setScreen] = useState<Screen>("title");
 
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoad({ status: "loading" });
-    fetchTown(ac.signal)
-      .then((town) => setLoad({ status: "ready", town }))
-      .catch((e: Error) => { if (!ac.signal.aborted) setLoad({ status: "error", message: e.message }); });
-    return () => ac.abort();
-  }, [attempt]);
-
-  const town = load.status === "ready" ? load.town : null;
-  const session = useMemo(() => (town ? new Session(town) : null), [town]);
-
-  return (
-    <main className="town-screen">
-      <header>
-        <h1>Butterfly Town</h1>
-        {town && <span className="town-name">{town.name}</span>}
-      </header>
-      {load.status === "loading" && <p className="status">街の地図を読み込んでいます…</p>}
-      {load.status === "error" && (
-        <div className="status error" role="alert">
-          <p>{load.message}</p>
-          <button onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</button>
-        </div>
-      )}
-      {session && <GameView session={session} />}
-      {session && <p className="hint">行きたい方向を長押しすると歩きます。離すと止まります。</p>}
-    </main>
-  );
+  switch (screen) {
+    case "title": return <TitleScreen onGuest={() => setScreen("dress")} onHowTo={() => setScreen("howto")} />;
+    case "howto": return <HowToScreen onStart={() => setScreen("dress")} onBack={() => setScreen("title")} />;
+    case "dress": return <DressScreen onEnter={() => setScreen("town")} onBack={() => setScreen("title")} />;
+    case "town": return <TownScreen onExitToTitle={() => setScreen("title")} />;
+  }
 }
