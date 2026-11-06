@@ -3,6 +3,8 @@ import Phaser from "phaser";
 import { measuredRects, SPRITE_FILES } from "../core/appearance";
 import type { Point } from "../core/world";
 import type { Session } from "../game/session";
+import { VIEW_SIZE, type ViewSize } from "../core/camera";
+import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
 const ART_BASE = "art/";
 
@@ -16,6 +18,9 @@ class TownScene extends Phaser.Scene {
   private ring!: Phaser.GameObjects.Graphics;
   private resident!: Phaser.GameObjects.Container;
   private residentLabel!: Phaser.GameObjects.Text;
+  private residentPlate!: Phaser.GameObjects.Graphics;
+  private compact = false; // スマホ表示（名札を小さくし、拡大して描く）
+  private zoom = 1; // 描く倍率。PC は 1。スマホは画面の細かさに合わせて上げ、文字や絵をぼやけさせない
   created = false;
 
   constructor() { super("town"); }
@@ -54,6 +59,8 @@ class TownScene extends Phaser.Scene {
     }
     this.resident = makeResident(this, this.session);
     this.residentLabel = this.resident.getByName("label") as Phaser.GameObjects.Text;
+    this.residentPlate = this.resident.getByName("plate") as Phaser.GameObjects.Graphics;
+    this.applyLook();
     this.textures.addCanvas("foreground", makeForeground(this.textures.get(town.background).getSourceImage() as HTMLImageElement, this.session));
     this.add.image(0, 0, "foreground").setOrigin(0, 0).setDepth(3);
     this.ring = this.add.graphics().setDepth(4);
@@ -62,11 +69,40 @@ class TownScene extends Phaser.Scene {
     this.hooks.onReady();
   }
 
+  // スマホとPCで見た目を切り替える（倍率が変わったときも呼ぶ）。描き始める前に呼んでもよい
+  setLook(compact: boolean, zoom: number) {
+    this.compact = compact;
+    this.zoom = zoom;
+    if (this.created) this.applyLook();
+  }
+
+  // スマホ：小さめの文字を角丸の札に載せる（街の看板になじむ色）。PC：これまでの名札
+  private applyLook() {
+    const t = this.residentLabel;
+    t.setResolution(this.zoom);
+    if (this.compact) {
+      t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2).setY(-150 - 10);
+      this.residentPlate.setVisible(true);
+      this.drawPlate(this.session.nearResident);
+    } else {
+      t.setFontSize(22).setPadding(10, 4, 10, 4).setY(-150 - 14);
+      this.residentPlate.clear().setVisible(false);
+    }
+  }
+
+  private drawPlate(near: boolean) {
+    const t = this.residentLabel, w = t.width, h = t.height, g = this.residentPlate;
+    g.clear().fillStyle(near ? 0xf3d88f : 0xfbf7ec, near ? 0.95 : 0.82).fillRoundedRect(-w / 2, t.y - h, w, h, h / 2)
+      .lineStyle(1.5, 0x254b43, 0.55).strokeRoundedRect(-w / 2, t.y - h, w, h, h / 2);
+  }
+
   update(_time: number, delta: number) {
     if (!this.created) return;
     const s = this.session, sim = s.sim;
     s.tick(delta / 1000);
-    this.cameras.main.setScroll(s.view.x, s.view.y);
+    const cam = this.cameras.main;
+    if (this.zoom === 1) cam.setScroll(s.view.x, s.view.y);
+    else { cam.setZoom(this.zoom); cam.centerOn(s.view.x + s.view.w / 2, s.view.y + s.view.h / 2); }
     this.sprites.forEach((o) => { o.img.setVisible(false); o.shadow.setVisible(false); });
     s.actors().forEach((a, i) => {
       const o = this.sprites.get(a.key)!, p = a.pose;
@@ -78,7 +114,8 @@ class TownScene extends Phaser.Scene {
     });
     // 仮の住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
     this.resident.setDepth(s.resident.pos.y < sim.pos.y ? 1.5 : 2.9);
-    this.residentLabel.setBackgroundColor(s.nearResident ? "#f3d88f" : "#fbf7ec");
+    if (this.compact) this.drawPlate(s.nearResident);
+    else this.residentLabel.setBackgroundColor(s.nearResident ? "#f3d88f" : "#fbf7ec");
     this.ring.clear();
     if (sim.target) this.ring.lineStyle(3, sim.blocked ? 0xeab86b : 0xfff9d2, 1).strokeCircle(sim.target.x, sim.target.y, 13);
   }
@@ -96,7 +133,8 @@ function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Conta
     fontFamily: '"Noto Sans JP", "Hiragino Sans", sans-serif', fontSize: "22px", color: "#254b43", backgroundColor: "#fbf7ec",
     padding: { x: 10, y: 4 }
   }).setOrigin(0.5, 1).setName("label");
-  return scene.add.container(pos.x, pos.y, [g, label]).setDepth(1.5);
+  const plate = scene.add.graphics().setName("plate").setVisible(false); // スマホの角丸の名札（文字の後ろ）
+  return scene.add.container(pos.x, pos.y, [g, plate, label]).setDepth(1.5);
 }
 
 // 背景から手前の植栽だけを切り抜いた透過画像。人物の上に重ねて「植栽の奥にいる」ように見せる
@@ -122,6 +160,8 @@ function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
   const down = (e: PointerEvent) => {
     if (id !== null || e.button !== 0) return;
     e.preventDefault();
+    // スマホでは住民をタップすると選ぶだけにし、歩き出さない（PC はこれまでどおり押した所へ歩く）
+    if (window.matchMedia(PHONE_QUERY).matches && s.tapResident(toWorld(e))) return;
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
     s.press(toWorld(e));
@@ -144,18 +184,31 @@ function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
   };
 }
 
+// 枠の大きさから、映す大きさ（街の座標）と描く倍率を決める。PC は 1100×660・倍率1のまま。
+// スマホは枠と同じ形で映し、画面の点の細かさ（最大2倍）まで拡大して描く（キャンバスが粗く、小さい文字がぼやけるのを防ぐ）
+function layoutFor(host: HTMLElement, s: Session): { view: ViewSize; zoom: number; phone: boolean } {
+  if (!window.matchMedia(PHONE_QUERY).matches) return { view: VIEW_SIZE, zoom: 1, phone: false };
+  const r = host.getBoundingClientRect(), view = phoneViewSize(r.width, r.height, s.town);
+  const zoom = Math.max(1, (r.width / view.w) * Math.min(window.devicePixelRatio || 1, 2));
+  return { view, zoom, phone: true };
+}
+
 // React から生成・破棄する窓口。mount は最初のフレームを描き終えたら解決し、destroy は破棄の完了で解決する
 export class PhaserTown {
   private game: Phaser.Game | null = null;
   private unbind: (() => void) | null = null;
+  private observer: ResizeObserver | null = null;
   private dead = false;
   private destroyed: Promise<void> | null = null;
 
   mount(parent: HTMLElement, session: Session): Promise<void> {
     return new Promise((ready, reject) => {
       const scene = new TownScene();
+      let layout = layoutFor(parent, session);
+      session.setViewSize(layout.view);
+      scene.setLook(layout.phone, layout.zoom);
       const game = new Phaser.Game({
-        type: Phaser.AUTO, parent, width: session.view.w, height: session.view.h, backgroundColor: "#ece8dc",
+        type: Phaser.AUTO, parent, width: Math.round(session.view.w * layout.zoom), height: Math.round(session.view.h * layout.zoom), backgroundColor: "#ece8dc",
         // 中央寄せは外側の CSS（.world-host の flex）で行う。Phaser の autoCenter も使うと余白が二重につき、左にずれる
         scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.NO_CENTER },
         banner: false, audio: { noAudio: true }, scene: []
@@ -167,7 +220,23 @@ export class PhaserTown {
         game.canvas.classList.add("world-canvas");
         game.scene.add("town", scene, true, {
           session,
-          onReady: () => { if (!this.dead) this.unbind = bindPointer(game.canvas, session); },
+          onReady: () => {
+            if (this.dead) return;
+            this.unbind = bindPointer(game.canvas, session);
+            // 画面の回転・大きさの変更に合わせて、映す大きさと描く大きさを揃え直す（人物の位置と街の状態はそのまま）
+            this.observer = new ResizeObserver(() => {
+              const next = layoutFor(parent, session);
+              if (next.view.w === layout.view.w && next.view.h === layout.view.h && next.zoom === layout.zoom && next.phone === layout.phone) return;
+              layout = next;
+              const w = Math.round(next.view.w * next.zoom), h = Math.round(next.view.h * next.zoom);
+              session.setViewSize(next.view);
+              scene.setLook(next.phone, next.zoom);
+              game.scale.setGameSize(w, h);
+              const cam = scene.cameras.main.setSize(w, h);
+              if (next.zoom === 1) cam.setZoom(1);
+            });
+            this.observer.observe(parent);
+          },
           onError: (e: Error) => reject(e)
         } satisfies SceneData);
       });
@@ -181,6 +250,7 @@ export class PhaserTown {
     if (this.destroyed) return this.destroyed;
     this.dead = true;
     this.unbind?.();
+    this.observer?.disconnect();
     const game = this.game;
     this.destroyed = new Promise((done) => {
       if (!game) { done(); return; }

@@ -60,12 +60,13 @@ describe("仮の住民に話しかけられる距離", () => {
 
   it("住民の方へ歩くと近くにいる状態になり、知らせは変わったときに1回だけ届く", () => {
     const s = new Session(TOWN);
-    let calls = 0;
-    s.subscribe(() => calls++);
+    // 知らせは「歩いた」の合図でも届くので、近さが変わった回数だけを数える
+    let changes = 0, last = s.nearResident;
+    s.subscribe(() => { if (s.nearResident !== last) { changes++; last = s.nearResident; } });
     s.press(r);
     run(s, 3);
     expect(s.nearResident).toBe(true);
-    expect(calls).toBe(1);
+    expect(changes).toBe(1);
   });
 
   it("会話中（止めている間）は住民の近くから動かず、閉じると同じ位置から続く", () => {
@@ -81,5 +82,49 @@ describe("仮の住民に話しかけられる距離", () => {
     s.resume();
     expect(s.sim.pos).toEqual(at);
     expect(s.nearResident).toBe(true);
+  });
+});
+
+describe("スマホで住民をタップしたとき", () => {
+  const onResident = { x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 80 };
+
+  it("住民に当たったら選ぶだけで、主人公は歩き出さない", () => {
+    const s = new Session(TOWN);
+    expect(s.tapResident(onResident)).toBe(true);
+    run(s, 1);
+    expect(s.residentSelected).toBe(true);
+    expect(s.sim.pos).toEqual(TOWN.spawn);
+    expect(s.sim.target).toBeNull();
+  });
+
+  it("住民から外れたタップは選ばない（そのあと地面を押せば歩く）", () => {
+    const s = new Session(TOWN);
+    expect(s.tapResident(east)).toBe(false);
+    expect(s.residentSelected).toBe(false);
+  });
+
+  it("地面を押すと選択が外れ、話せる距離を離れても外れる", () => {
+    const s = new Session(TOWN);
+    s.tapResident(onResident);
+    s.press(east);
+    expect(s.residentSelected).toBe(false);
+  });
+
+  it("止めている間（メニュー・会話中）は選ばない", () => {
+    const s = new Session(TOWN);
+    s.pause();
+    expect(s.tapResident(onResident)).toBe(false);
+  });
+
+  it("話せる距離は今までどおり 120", () => {
+    expect(TALK_RANGE).toBe(120);
+  });
+
+  it("一度歩くと「歩いた」になる（移動の説明を消す合図）", () => {
+    const s = new Session(TOWN);
+    expect(s.hasWalked).toBe(false);
+    s.press(east);
+    run(s, 0.3);
+    expect(s.hasWalked).toBe(true);
   });
 });

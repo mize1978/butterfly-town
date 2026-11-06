@@ -91,22 +91,25 @@ p { margin: 0; }
 .town-actions { display: flex; align-items: center; gap: 12px; }
 .town-actions .btn { flex: none; min-width: 120px; }
 .town-actions .hint { text-align: left; }
+/* 会話・メニューを重ねている間は、押せない「話す」の列を見せない（会話ウィンドウと重なって紛らわしいため） */
+.town-stage[inert] .town-actions { visibility: hidden; }
 
-/* S06 住民との会話（試作）：街の上に不透明に重ねる。背後の街は止まったまま残っている */
-.talk-layer { position: absolute; inset: 0; z-index: 10; background: var(--paper); display: flex; flex-direction: column; gap: 16px;
-  padding: 20px; overflow: auto; }
-.talk-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 330px) 1fr; gap: 24px; width: 100%; max-width: 900px; margin: 0 auto; align-items: start; align-content: start; }
-.talk-portrait { aspect-ratio: 33 / 40; background: var(--field); border: 1px dashed var(--line); border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  color: var(--muted); font-size: 18px; min-height: 220px; }
-.talk-main { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.talk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.talk-head h2 { margin: 0; font-size: 24px; }
-.talk-log { list-style: none; margin: 0; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px;
-  display: flex; flex-direction: column; gap: 12px; min-height: 160px; overflow: auto; line-height: 1.7; }
-.talk-speaker { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
-.talk-note { color: var(--note); font-size: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
-.talk-actions { display: flex; justify-content: flex-end; gap: 12px; width: 100%; max-width: 900px; margin: 0 auto; }
-.talk-actions .btn { min-width: 160px; }
+/* S06 住民との会話（試作）：街の上に重ねる画面下の会話ウィンドウ。街は暗くせず、主人公と話し相手が見えたままにする */
+.talk-window { position: absolute; z-index: 10; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 24px));
+  background: rgba(251, 247, 236, .97); border: 3px solid var(--forest); border-radius: 14px; box-shadow: 0 10px 28px rgba(20, 40, 35, .28);
+  padding: 12px 18px; display: flex; flex-direction: column; gap: 6px; }
+.talk-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.talk-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--forest); }
+.talk-speaker { display: inline-block; margin-right: 10px; font-size: 14px; font-weight: 700; background: var(--forest); color: var(--cream); padding: 1px 10px; border-radius: 8px; vertical-align: 2px; }
+.talk-note .talk-speaker { background: var(--note); }
+.talk-badge { font-size: 12px; color: var(--note); border: 1px solid var(--note); border-radius: 999px; padding: 1px 8px; }
+.talk-count { margin-left: auto; font-size: 13px; color: var(--muted); }
+.talk-text { font-size: 18px; line-height: 1.7; min-height: 3.4em; }
+.talk-text.talk-note { color: var(--note); font-size: 16px; }
+.talk-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.talk-about { flex: 1 1 240px; font-size: 12px; color: var(--muted); }
+.talk-buttons { display: flex; gap: 8px; margin-left: auto; }
+.talk-buttons .btn { min-width: 110px; }
 
 /* メニュー：街の上に重ねる。開いている間、街は止まっている */
 .menu-layer { position: absolute; inset: 0; background: rgba(37, 75, 67, .28); display: flex; justify-content: flex-end; align-items: flex-start; padding: 10px 16px; z-index: 10; }
@@ -134,11 +137,6 @@ p { margin: 0; }
   .howto dd { margin-bottom: 8px; }
   .town-main { padding: 8px 12px 10px; }
   .menu-layer { padding: 8px; }
-  .talk-layer { padding: 12px; gap: 10px; }
-  .talk-grid { grid-template-columns: 1fr; gap: 10px; }
-  .talk-portrait { aspect-ratio: auto; min-height: 0; height: 64px; font-size: 14px; }
-  .talk-head h2 { font-size: 20px; }
-  .talk-actions .btn { flex: 1 1 0; min-width: 0; }
   .town-actions { gap: 8px; }
   .town-actions .btn { min-width: 96px; }
   .menu-panel { width: 100%; }
@@ -146,17 +144,10 @@ p { margin: 0; }
 
 /* 横向きのスマートフォンなど、高さが低い画面では帯と説明を詰めて街を広く見せる */
 @media (max-height: 480px) {
-  .bar { min-height: 44px; padding-block: 4px; }
-  .bar .btn { min-height: 36px; padding-block: 6px; }
   .town-main { padding-block: 4px 6px; }
   .town-stage { --stage-w: min(100%, calc((100dvh - 124px) * 5 / 3)); gap: 4px; }
   .town-actions .btn { min-height: 34px; padding-block: 4px; }
   .town-actions .hint { font-size: 12px; }
-  .talk-portrait { display: none; }
-  .talk-grid { grid-template-columns: 1fr; gap: 8px; }
-  .talk-head h2 { font-size: 19px; }
-  .talk-layer { padding: 8px 12px; gap: 8px; }
-  .talk-log { min-height: 80px; padding: 10px 14px; }
   .title-screen { padding-block: 10px; }
   .title-card { gap: 8px; padding: 14px 20px 12px; }
   .title-brand { font-size: 24px; }
@@ -164,4 +155,62 @@ p { margin: 0; }
   .title-sub { font-size: 13px; margin-bottom: 0; }
   .btn.start { min-height: 44px; font-size: 16px; }
   .title-card .locked-block { margin-top: 2px; padding-top: 8px; }
+}
+
+/* スマホの街画面（縦・横とも）：ヘッダーの下を街で埋める。映す範囲は枠と同じ形にする（game/view-size.ts・条件も同じ）。
+   街の名前は左上、「話す」と操作の説明は下に、街の上へ重ねる。会話ウィンドウも下に重なる。
+   重ねる部品は端末の角・ホームバー（セーフエリア）の内側に置く */
+@media (max-width: 640px), (max-height: 480px) {
+  /* ヘッダー：縦画面で高さ 56px（押せる範囲 44px のボタン＋上下 6px）。メニューは見た目 32px の札にし、
+     周りの透明な縁（6px）も押せる範囲に含めて 44px を保つ */
+  .bar { min-height: 56px; padding: 6px calc(12px + env(safe-area-inset-right, 0px)) 6px calc(16px + env(safe-area-inset-left, 0px)); gap: 8px; }
+  .brand { font-size: 16px; }
+  .bar .btn, .bar .menu-button { min-height: 44px; padding: 0 12px; font-size: 14px; border: 6px solid transparent; background-clip: padding-box; border-radius: 14px; }
+  .bar .menu-button:disabled { border-color: transparent; }
+
+  /* 100vh は「ブラウザの操作バーを隠したときの高さ」なので、バーが出ている間はページがその分だけ長くなり、
+     下に余白・はみ出しが出る。街の画面では今の見えている高さ（100dvh）に合わせ、ページ自体はスクロールさせない */
+  body:has(.town-frame) { min-height: 100dvh; overflow: hidden; overscroll-behavior: none; }
+  .town-main { padding: 0; justify-content: stretch; align-items: stretch; }
+  .town-stage { position: relative; width: 100%; flex: 1; gap: 0; }
+  .world-wrap { aspect-ratio: auto; flex: 1; min-height: 0; }
+  .world-host canvas.world-canvas { border-radius: 0; box-shadow: none; }
+  .town-info, .town-actions { position: absolute; z-index: 2; pointer-events: none;
+    left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); }
+  .town-info { top: 8px; gap: 6px; font-size: 13px; }
+  .town-info > * { background: rgba(251, 247, 236, .92); border-radius: 999px; padding: 2px 10px; }
+  .town-info .badge { font-size: 11px; }
+  .town-actions { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); flex-direction: column; align-items: center; gap: 6px; }
+  /* 「話す」：見た目は小さめの丸い札、押せる範囲は 44px 以上 */
+  .town-actions .btn { pointer-events: auto; min-width: 88px; min-height: 44px; padding: 0 20px; border-radius: 999px; font-size: 15px;
+    box-shadow: 0 3px 10px rgba(20, 40, 35, .25); }
+  .town-actions .hint { text-align: center; font-size: 12px; color: var(--ink); background: rgba(251, 247, 236, .9); border-radius: 999px; padding: 2px 12px; }
+  .town-actions .hint:empty { display: none; }
+
+  /* 会話ウィンドウ：名前・本文・次へ・閉じるだけの小さな半透明の枠。見出しは読み上げ用に残して画面からは隠し（名札と重複するため）、
+     開発用の説明は出さない（「サンプル会話・AI未接続」の印は残す）。長い文は本文だけスクロールし、ボタンは常に枠の下に見える */
+  .talk-window { width: auto; transform: none; left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)); max-height: min(40%, 240px);
+    background: rgba(251, 247, 236, .95); border-width: 2px; border-radius: 12px; padding: 8px 12px 10px; gap: 4px; }
+  .talk-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .talk-head { flex: none; gap: 6px; }
+  .talk-badge { font-size: 10px; padding: 0 6px; }
+  .talk-count { font-size: 12px; }
+  /* 本文：名札は上に残し、文だけをスクロールさせる */
+  .talk-text { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 15px; line-height: 1.6; }
+  .talk-line { display: block; align-self: stretch; min-height: 1.6em; overflow-y: auto; overscroll-behavior: contain; }
+  .talk-text.talk-note { font-size: 14px; }
+  .talk-speaker { flex: none; font-size: 12px; margin-right: 0; padding: 0 8px; }
+  .talk-about { display: none; }
+  .talk-foot { flex: none; }
+  .talk-buttons { width: 100%; }
+  .talk-buttons .btn { flex: 1 1 0; min-width: 0; min-height: 44px; }
+}
+@media (max-height: 480px) {
+  .bar { min-height: 48px; padding-block: 2px; } /* 横画面はさらに詰める（ボタンの押せる範囲 44px は保つ） */
+  .town-actions { left: auto; align-items: flex-end; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  /* 横画面：下に低く置き、画面中央の主人公と住民の顔を隠さない。ボタンは右に寄せて横に並べる */
+  .talk-window { max-height: 46%; padding: 6px 12px 8px; }
+  .talk-buttons { width: auto; }
+  .talk-buttons .btn { flex: none; min-width: 96px; min-height: 44px; }
 }
