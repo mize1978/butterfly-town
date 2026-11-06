@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { measuredRects, SPRITE_FILES, WALK_HEIGHT } from "../core/appearance";
 import type { Point } from "../core/world";
 import type { Session } from "../game/session";
+import type { Rect } from "../game/sample-resident";
 import { VIEW_SIZE, type ViewSize } from "../core/camera";
 import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
@@ -74,6 +75,12 @@ class TownScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, W, H);
     this.created = true;
     this.hooks.onReady();
+  }
+
+  // 名札がいま描かれている範囲（論理座標）。住民を選ぶタップの当たり判定に使う
+  tagBounds(): Rect {
+    const b = this.residentLabel.getBounds();
+    return { x: b.x, y: b.y, w: b.width, h: b.height };
   }
 
   // スマホとPCで見た目を切り替える（倍率が変わったときも呼ぶ）。描き始める前に呼んでもよい
@@ -162,7 +169,7 @@ function makeForeground(bg: CanvasImageSource, s: Session): HTMLCanvasElement {
 }
 
 // マウス（ポインター）を押している間だけ、押している地点を目標にする。離す・取り消し・フォーカス喪失で止まる
-function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
+function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Rect): () => void {
   let id: number | null = null;
   const toWorld = (e: PointerEvent): Point => {
     const r = el.getBoundingClientRect(), v = s.view;
@@ -172,7 +179,7 @@ function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
     if (id !== null || e.button !== 0) return;
     e.preventDefault();
     // スマホでは住民をタップすると選ぶだけにし、歩き出さない（PC はこれまでどおり押した所へ歩く）
-    if (window.matchMedia(PHONE_QUERY).matches && s.tapResident(toWorld(e))) return;
+    if (window.matchMedia(PHONE_QUERY).matches && s.tapResident(toWorld(e), tagBounds())) return;
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
     s.press(toWorld(e));
@@ -233,7 +240,7 @@ export class PhaserTown {
           session,
           onReady: () => {
             if (this.dead) return;
-            this.unbind = bindPointer(game.canvas, session);
+            this.unbind = bindPointer(game.canvas, session, () => scene.tagBounds());
             // 画面の回転・大きさの変更に合わせて、映す大きさと描く大きさを揃え直す（人物の位置と街の状態はそのまま）
             this.observer = new ResizeObserver(() => {
               const next = layoutFor(parent, session);

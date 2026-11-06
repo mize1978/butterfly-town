@@ -97,11 +97,28 @@ describe("スマホで住民をタップしたとき", () => {
     expect(s.sim.target).toBeNull();
   });
 
-  it("頭の上の名札をタップしても選べる", () => {
-    const s = new Session(TOWN);
-    expect(s.tapResident({ x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 225 })).toBe(true);
-    expect(s.sim.target).toBeNull();
-  });
+  // 名札の範囲（描画側が渡す）。スマホの名札は体より少し広い。名前が長いなどでさらに広い場合も確かめる。
+  // どちらも左右の端は体の当たり範囲（±40）の外にある
+  const R = SAMPLE_RESIDENT.pos;
+  const tag = (halfW: number, h: number) => ({ x: R.x - halfW, y: R.y - 207 - h, w: halfW * 2, h });
+  for (const [label, t] of [["スマホの名札", tag(53, 27)], ["さらに広い名札", tag(76, 38)]] as const) {
+    it(`${label}：名札の中央・左端・右端のどこを押しても選べ、歩き出さない`, () => {
+      const midY = t.y + t.h / 2;
+      for (const x of [R.x, t.x + 1, t.x + t.w - 1]) {
+        const s = new Session(TOWN);
+        expect(s.tapResident({ x, y: midY }, t)).toBe(true);
+        run(s, 0.5);
+        expect(s.sim.pos).toEqual(TOWN.spawn);
+        expect(s.sim.target).toBeNull();
+      }
+    });
+
+    it(`${label}：名札から少し外れた所は選ばない（地面への移動になる）`, () => {
+      const s = new Session(TOWN);
+      expect(s.tapResident({ x: t.x + t.w + 20, y: t.y + t.h / 2 }, t)).toBe(false);
+      expect(s.tapResident({ x: R.x, y: t.y - 20 }, t)).toBe(false);
+    });
+  }
 
   it("住民から外れたタップは選ばない（そのあと地面を押せば歩く）", () => {
     const s = new Session(TOWN);

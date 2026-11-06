@@ -4,7 +4,7 @@ import { WALK } from "../core/motion";
 import { Sim } from "../core/sim";
 import { walkerActors, type Actor } from "../core/walker";
 import type { Point, Town } from "../core/world";
-import { hitsResident, SAMPLE_RESIDENT, TALK_RANGE, type SampleResident } from "./sample-resident";
+import { hitsResident, SAMPLE_RESIDENT, TALK_RANGE, type Rect, type SampleResident } from "./sample-resident";
 
 export class Session {
   readonly sim: Sim;
@@ -43,9 +43,10 @@ export class Session {
   }
   release() { this.sim.release(); }
 
-  // 住民を選ぶタップ。住民に当たったら選ぶだけで、歩き出さない（true を返す）。外れたら何もしない（false）
-  tapResident(p: Point): boolean {
-    if (this.paused || !hitsResident(this.resident, p)) return false;
+  // 住民を選ぶタップ。体か名札（tag：描いている名札の範囲）に当たったら選ぶだけで、歩き出さない（true を返す）。
+  // 外れたら何もしない（false）
+  tapResident(p: Point, tag?: Rect): boolean {
+    if (this.paused || !hitsResident(this.resident, p, tag)) return false;
     this.setSelected(true);
     return true;
   }

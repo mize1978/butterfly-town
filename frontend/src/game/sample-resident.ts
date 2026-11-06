@@ -8,11 +8,16 @@ export type SampleResident = { id: string; name: string; pos: Point; lines: read
 // 話しかけられる距離（足元どうし・論理座標）。人物の高さ 195 の6割ほど
 export const TALK_RANGE = 120;
 
-// 住民を選ぶタップの当たり範囲（足元からの位置・論理座標）。体と名札を含め、指で押しやすいよう少し広めにとる。
-// 立ち絵は頭頂まで 195、名札はその 12 上から約 40 の高さ（PC）なので、上は 250 まで
-export const RESIDENT_HIT = { halfW: 40, top: 250, bottom: 16 } as const;
-export function hitsResident(r: SampleResident, p: Point): boolean {
-  return Math.abs(p.x - r.pos.x) <= RESIDENT_HIT.halfW && p.y >= r.pos.y - RESIDENT_HIT.top && p.y <= r.pos.y + RESIDENT_HIT.bottom;
+// 住民を選ぶタップの当たり範囲（論理座標）。体は足元からの箱（立ち絵の頭頂 195 に少し余裕を足す）。
+// 名札は文字の大きさ・名前の長さで幅が変わる（スマホとPCでも違う）ので、描いている名札の範囲（tag）をそのまま使い、
+// 指で押しやすいよう周りを TAG_PAD だけ広げる
+export type Rect = { x: number; y: number; w: number; h: number };
+export const RESIDENT_HIT = { halfW: 40, top: 210, bottom: 16 } as const;
+export const TAG_PAD = 6;
+export function hitsResident(r: SampleResident, p: Point, tag?: Rect): boolean {
+  const body = Math.abs(p.x - r.pos.x) <= RESIDENT_HIT.halfW && p.y >= r.pos.y - RESIDENT_HIT.top && p.y <= r.pos.y + RESIDENT_HIT.bottom;
+  const onTag = !!tag && p.x >= tag.x - TAG_PAD && p.x <= tag.x + tag.w + TAG_PAD && p.y >= tag.y - TAG_PAD && p.y <= tag.y + tag.h + TAG_PAD;
+  return body || onTag;
 }
 
 export const SAMPLE_RESIDENT: SampleResident = {
