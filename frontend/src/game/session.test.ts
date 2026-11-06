@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TOWN } from "../test/town";
+import { allowed } from "../core/world";
+import { SAMPLE_RESIDENT, TALK_RANGE } from "./sample-resident";
 import { Session } from "./session";
 
 const run = (s: Session, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.tick(dt); };
@@ -44,5 +46,40 @@ describe("メニューを開いている間の街", () => {
     s.press(east);
     run(s, 0.3);
     expect(s.sim.pos.x).toBeGreaterThan(pos.x);
+  });
+});
+
+describe("仮の住民に話しかけられる距離", () => {
+  const r = SAMPLE_RESIDENT.pos;
+
+  it("住民は歩ける範囲にいて、出現位置からは少し歩かないと届かない", () => {
+    expect(allowed(TOWN, r.x, r.y)).toBe(true);
+    expect(Math.hypot(r.x - TOWN.spawn.x, r.y - TOWN.spawn.y)).toBeGreaterThan(TALK_RANGE);
+    expect(new Session(TOWN).nearResident).toBe(false);
+  });
+
+  it("住民の方へ歩くと近くにいる状態になり、知らせは変わったときに1回だけ届く", () => {
+    const s = new Session(TOWN);
+    let calls = 0;
+    s.subscribe(() => calls++);
+    s.press(r);
+    run(s, 3);
+    expect(s.nearResident).toBe(true);
+    expect(calls).toBe(1);
+  });
+
+  it("会話中（止めている間）は住民の近くから動かず、閉じると同じ位置から続く", () => {
+    const s = new Session(TOWN);
+    s.press(r);
+    run(s, 3);
+    s.release();
+    run(s, 0.5);
+    const at = { ...s.sim.pos };
+    s.pause();
+    s.press(TOWN.spawn);
+    run(s, 2);
+    s.resume();
+    expect(s.sim.pos).toEqual(at);
+    expect(s.nearResident).toBe(true);
   });
 });

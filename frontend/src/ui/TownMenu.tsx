@@ -1,7 +1,8 @@
 // 街のメニュー（S05 の「記録・着せ替え・保存・中断」などの入口をまとめたもの）。開いている間、街は止まっている。
 // いまゲストで使えるのは「街へ戻る」「遊び方」「トップへ戻る」だけ。記録・着せ替え・保存は未実装なので、押せない理由を示す。
 // アカウント設定（S33）はログイン中だけの項目なので、ゲストには出さない
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { dialogKeys } from "./dialog";
 import { Locked } from "./Frame";
 import { HowToBody } from "./HowToScreen";
 
@@ -14,16 +15,8 @@ export function TownMenu({ onClose, onExitToTitle }: { onClose: () => void; onEx
   // 開いたとき・中身が変わったときは、最初の操作にフォーカスを移す
   useEffect(() => { panel.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus(); }, [view]);
 
-  // Esc で閉じる。Tab はメニューの中だけを巡る
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") { e.preventDefault(); if (view === "main") onClose(); else setView("main"); return; }
-    if (e.key !== "Tab" || !panel.current) return;
-    const items = [...panel.current.querySelectorAll<HTMLElement>("button:not([disabled])")];
-    if (!items.length) return;
-    const first = items[0], last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  };
+  // Esc で閉じる（項目の中にいるときはメニューの最初へ戻る）。Tab はメニューの中だけを巡る
+  const onKeyDown = dialogKeys(panel, () => (view === "main" ? onClose() : setView("main")));
 
   const back = <button type="button" className="btn" onClick={() => setView("main")}>メニューへ戻る</button>;
   const title = { main: "メニュー", howto: "遊び方", save: "保存・中断", leave: "トップへ戻る" }[view];

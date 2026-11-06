@@ -22,6 +22,7 @@ p { margin: 0; }
 .brand { font-weight: 700; font-size: 22px; letter-spacing: .01em; }
 .bar-label { margin-left: auto; font-weight: 700; font-size: 15px; opacity: .9; }
 .bar .menu-button { background: var(--cream); color: var(--forest); border-color: var(--cream); font-weight: 700; }
+.bar .menu-button:disabled { opacity: .45; border-style: solid; }
 
 .page { width: 100%; max-width: 900px; margin: 0 auto; padding: 32px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
 .lead { font-size: 30px; font-weight: 700; margin: 0; line-height: 1.35; }
@@ -68,8 +69,8 @@ p { margin: 0; }
 /* S05 街・徒歩 */
 .town-frame { height: 100vh; height: 100dvh; min-height: 0; }
 .town-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 16px 12px; }
-/* 幅は「画面幅」と「残りの高さ×5/3」の小さい方（帯・情報・説明の分 約150px を引く） */
-.town-stage { --stage-w: min(100%, calc((100dvh - 150px) * 5 / 3)); width: var(--stage-w); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+/* 幅は「画面幅」と「残りの高さ×5/3」の小さい方（帯・情報・話すボタンの分 約180px を引く） */
+.town-stage { --stage-w: min(100%, calc((100dvh - 180px) * 5 / 3)); width: var(--stage-w); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .town-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; }
 .town-name { font-weight: 700; }
 .badge { font-size: 13px; color: var(--note); border: 1px solid var(--note); border-radius: 999px; padding: 1px 10px; }
@@ -82,6 +83,27 @@ p { margin: 0; }
 .hint { font-size: 13px; text-align: center; color: var(--muted); }
 .status { margin: auto; text-align: center; display: grid; gap: 12px; justify-items: center; }
 .status.error { color: var(--clay); }
+
+/* 話すボタンと操作の説明（Figma S05 の下の操作列にあたる） */
+.town-actions { display: flex; align-items: center; gap: 12px; }
+.town-actions .btn { flex: none; min-width: 120px; }
+.town-actions .hint { text-align: left; }
+
+/* S06 住民との会話（試作）：街の上に不透明に重ねる。背後の街は止まったまま残っている */
+.talk-layer { position: absolute; inset: 0; z-index: 10; background: var(--paper); display: flex; flex-direction: column; gap: 16px;
+  padding: 20px; overflow: auto; }
+.talk-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 330px) 1fr; gap: 24px; width: 100%; max-width: 900px; margin: 0 auto; align-items: start; align-content: start; }
+.talk-portrait { aspect-ratio: 33 / 40; background: var(--field); border: 1px dashed var(--line); border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 18px; min-height: 220px; }
+.talk-main { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.talk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.talk-head h2 { margin: 0; font-size: 24px; }
+.talk-log { list-style: none; margin: 0; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  display: flex; flex-direction: column; gap: 12px; min-height: 160px; overflow: auto; line-height: 1.7; }
+.talk-speaker { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+.talk-note { color: var(--note); font-size: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.talk-actions { display: flex; justify-content: flex-end; gap: 12px; width: 100%; max-width: 900px; margin: 0 auto; }
+.talk-actions .btn { min-width: 160px; }
 
 /* メニュー：街の上に重ねる。開いている間、街は止まっている */
 .menu-layer { position: absolute; inset: 0; background: rgba(37, 75, 67, .28); display: flex; justify-content: flex-end; align-items: flex-start; padding: 10px 16px; z-index: 10; }
@@ -109,6 +131,13 @@ p { margin: 0; }
   .howto dd { margin-bottom: 8px; }
   .town-main { padding: 8px 12px 10px; }
   .menu-layer { padding: 8px; }
+  .talk-layer { padding: 12px; gap: 10px; }
+  .talk-grid { grid-template-columns: 1fr; gap: 10px; }
+  .talk-portrait { aspect-ratio: auto; min-height: 0; height: 64px; font-size: 14px; }
+  .talk-head h2 { font-size: 20px; }
+  .talk-actions .btn { flex: 1 1 0; min-width: 0; }
+  .town-actions { gap: 8px; }
+  .town-actions .btn { min-width: 96px; }
   .menu-panel { width: 100%; }
 }
 
@@ -117,8 +146,14 @@ p { margin: 0; }
   .bar { min-height: 44px; padding-block: 4px; }
   .bar .btn { min-height: 36px; padding-block: 6px; }
   .town-main { padding-block: 4px 6px; }
-  .town-stage { --stage-w: min(100%, calc((100dvh - 90px) * 5 / 3)); gap: 4px; }
-  .town-main .hint { display: none; }
+  .town-stage { --stage-w: min(100%, calc((100dvh - 124px) * 5 / 3)); gap: 4px; }
+  .town-actions .btn { min-height: 34px; padding-block: 4px; }
+  .town-actions .hint { font-size: 12px; }
+  .talk-portrait { display: none; }
+  .talk-grid { grid-template-columns: 1fr; gap: 8px; }
+  .talk-head h2 { font-size: 19px; }
+  .talk-layer { padding: 8px 12px; gap: 8px; }
+  .talk-log { min-height: 80px; padding: 10px 14px; }
   .title-screen { padding-block: 10px; }
   .title-card { gap: 8px; padding: 14px 20px 12px; }
   .title-brand { font-size: 24px; }
