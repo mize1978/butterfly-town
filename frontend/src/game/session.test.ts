@@ -97,6 +97,12 @@ describe("スマホで住民をタップしたとき", () => {
     expect(s.sim.target).toBeNull();
   });
 
+  it("頭の上の名札をタップしても選べる", () => {
+    const s = new Session(TOWN);
+    expect(s.tapResident({ x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 225 })).toBe(true);
+    expect(s.sim.target).toBeNull();
+  });
+
   it("住民から外れたタップは選ばない（そのあと地面を押せば歩く）", () => {
     const s = new Session(TOWN);
     expect(s.tapResident(east)).toBe(false);

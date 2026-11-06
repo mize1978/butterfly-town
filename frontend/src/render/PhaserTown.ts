@@ -1,12 +1,17 @@
 // Phaser 4 で街と人物を描く。移動と衝突は Phaser の物理エンジンを使わず、共通の多角形判定（core/world.ts）で行う。
 import Phaser from "phaser";
-import { measuredRects, SPRITE_FILES } from "../core/appearance";
+import { measuredRects, SPRITE_FILES, WALK_HEIGHT } from "../core/appearance";
 import type { Point } from "../core/world";
 import type { Session } from "../game/session";
 import { VIEW_SIZE, type ViewSize } from "../core/camera";
 import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
 const ART_BASE = "art/";
+
+// 仮の住民（名前のない一般住民）の立ち絵。出どころ・確認結果は ~/outputs/butterfly-resident-placeholder-01/REPORT.md（候補2）。
+// 足元の中央と頭頂〜足裏の大きさは画像を測った値。主人公と同じ高さ（WALK_HEIGHT）で、足元を住民の位置に合わせて描く
+const RESIDENT_ART = { key: "resident-a", footX: 560, footY: 1524, figureH: 1510 } as const;
+const LABEL_GAP = 12; // 頭頂と名札の間（論理座標）
 
 type SceneData = { session: Session; onReady: () => void; onError: (e: Error) => void };
 
@@ -17,6 +22,7 @@ class TownScene extends Phaser.Scene {
   private sprites = new Map<string, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse }>();
   private ring!: Phaser.GameObjects.Graphics;
   private resident!: Phaser.GameObjects.Container;
+  private residentTag!: Phaser.GameObjects.Container; // 名札（人物より手前の層に置き、主人公に隠れないようにする）
   private residentLabel!: Phaser.GameObjects.Text;
   private residentPlate!: Phaser.GameObjects.Graphics;
   private compact = false; // スマホ表示（名札を小さくし、拡大して描く）
@@ -26,7 +32,7 @@ class TownScene extends Phaser.Scene {
   constructor() { super("town"); }
   init(data: SceneData) { this.hooks = data; this.session = data.session; }
 
-  private files() { return [this.session.town.background, ...SPRITE_FILES]; }
+  private files() { return [this.session.town.background, ...SPRITE_FILES, RESIDENT_ART.key]; }
 
   preload() {
     this.load.on("loaderror", (f: Phaser.Loader.File) => this.fail(`素材の読み込みに失敗：${f.key}.png`));
@@ -58,8 +64,9 @@ class TownScene extends Phaser.Scene {
       });
     }
     this.resident = makeResident(this, this.session);
-    this.residentLabel = this.resident.getByName("label") as Phaser.GameObjects.Text;
-    this.residentPlate = this.resident.getByName("plate") as Phaser.GameObjects.Graphics;
+    this.residentTag = makeResidentTag(this, this.session);
+    this.residentLabel = this.residentTag.getByName("label") as Phaser.GameObjects.Text;
+    this.residentPlate = this.residentTag.getByName("plate") as Phaser.GameObjects.Graphics;
     this.applyLook();
     this.textures.addCanvas("foreground", makeForeground(this.textures.get(town.background).getSourceImage() as HTMLImageElement, this.session));
     this.add.image(0, 0, "foreground").setOrigin(0, 0).setDepth(3);
@@ -81,11 +88,11 @@ class TownScene extends Phaser.Scene {
     const t = this.residentLabel;
     t.setResolution(this.zoom);
     if (this.compact) {
-      t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2).setY(-150 - 10);
+      t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2).setY(-WALK_HEIGHT - LABEL_GAP);
       this.residentPlate.setVisible(true);
       this.drawPlate(this.session.nearResident);
     } else {
-      t.setFontSize(22).setPadding(10, 4, 10, 4).setY(-150 - 14);
+      t.setFontSize(22).setPadding(10, 4, 10, 4).setY(-WALK_HEIGHT - LABEL_GAP);
       this.residentPlate.clear().setVisible(false);
     }
   }
@@ -121,20 +128,24 @@ class TownScene extends Phaser.Scene {
   }
 }
 
-// 仮の住民。立ち絵・歩行素材はまだ無いので、人物と見分けられる単純な形と「（仮）」付きの名札で示す
+// 仮の住民。立ち絵1枚と足元の影。前後関係は足元の y で主人公と比べて決める（update）
 function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Container {
-  const { pos, name } = s.resident, H = 150;
-  const g = scene.add.graphics();
-  g.fillStyle(0x243e35, 0.27).fillEllipse(0, -3, 40, 14); // 影
-  g.fillStyle(0x254b43, 0.85).fillRoundedRect(-20, -H + 34, 40, H - 34, 16); // 体
-  g.fillCircle(0, -H + 18, 18); // 頭
-  g.lineStyle(3, 0xfff9e9, 0.9).strokeRoundedRect(-20, -H + 34, 40, H - 34, 16).strokeCircle(0, -H + 18, 18);
-  const label = scene.add.text(0, -H - 14, name, {
+  const { pos } = s.resident, a = RESIDENT_ART;
+  const shadow = scene.add.ellipse(0, -3, 40, 14, 0x243e35, 0.27);
+  const img = scene.add.image(0, 0, a.key);
+  img.setOrigin(a.footX / img.width, a.footY / img.height).setScale(WALK_HEIGHT / a.figureH);
+  return scene.add.container(pos.x, pos.y, [shadow, img]).setDepth(1.5);
+}
+
+// 住民の名札。人物・手前の植栽より上の層（深さ 3.5）に描くので、主人公が手前に来ても隠れない（目標の輪は 4 で、さらに上）
+function makeResidentTag(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Container {
+  const { pos, name } = s.resident;
+  const label = scene.add.text(0, -WALK_HEIGHT - LABEL_GAP, name, {
     fontFamily: '"Noto Sans JP", "Hiragino Sans", sans-serif', fontSize: "22px", color: "#254b43", backgroundColor: "#fbf7ec",
     padding: { x: 10, y: 4 }
   }).setOrigin(0.5, 1).setName("label");
   const plate = scene.add.graphics().setName("plate").setVisible(false); // スマホの角丸の名札（文字の後ろ）
-  return scene.add.container(pos.x, pos.y, [g, plate, label]).setDepth(1.5);
+  return scene.add.container(pos.x, pos.y, [plate, label]).setDepth(3.5);
 }
 
 // 背景から手前の植栽だけを切り抜いた透過画像。人物の上に重ねて「植栽の奥にいる」ように見せる

@@ -8,8 +8,9 @@ export type SampleResident = { id: string; name: string; pos: Point; lines: read
 // 話しかけられる距離（足元どうし・論理座標）。人物の高さ 195 の6割ほど
 export const TALK_RANGE = 120;
 
-// 住民を選ぶタップの当たり範囲（足元からの位置・論理座標）。体と名札を含め、指で押しやすいよう少し広めにとる
-export const RESIDENT_HIT = { halfW: 40, top: 210, bottom: 16 } as const;
+// 住民を選ぶタップの当たり範囲（足元からの位置・論理座標）。体と名札を含め、指で押しやすいよう少し広めにとる。
+// 立ち絵は頭頂まで 195、名札はその 12 上から約 40 の高さ（PC）なので、上は 250 まで
+export const RESIDENT_HIT = { halfW: 40, top: 250, bottom: 16 } as const;
 export function hitsResident(r: SampleResident, p: Point): boolean {
   return Math.abs(p.x - r.pos.x) <= RESIDENT_HIT.halfW && p.y >= r.pos.y - RESIDENT_HIT.top && p.y <= r.pos.y + RESIDENT_HIT.bottom;
 }
