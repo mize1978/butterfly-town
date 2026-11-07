@@ -2,8 +2,8 @@
 import Phaser from "phaser";
 import { measuredRects, SPRITE_FILES, WALK_HEIGHT } from "../core/appearance";
 import type { Point } from "../core/world";
-import type { Session } from "../game/session";
-import type { Rect } from "../game/sample-resident";
+import type { Session, Tags } from "../game/session";
+import { PART, partPlaced, SHOP, type SpotId } from "../game/errand";
 import { VIEW_SIZE, type ViewSize } from "../core/camera";
 import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
@@ -13,6 +13,11 @@ const ART_BASE = "art/";
 // 足元の中央と頭頂〜足裏の大きさは画像を測った値。主人公と同じ高さ（WALK_HEIGHT）で、足元を住民の位置に合わせて描く
 const RESIDENT_ART = { key: "resident-a", footX: 560, footY: 1524, figureH: 1510 } as const;
 const LABEL_GAP = 12; // 頭頂と名札の間（論理座標）
+// 名札の下端の中央（論理座標）。スクーター修理は店の上に下がっている無地の木の看板に重ね、部品は印の少し上に出す
+const SHOP_TAG = { x: 577, y: 190 } as const;
+const PART_TAG_GAP = 40;
+
+type Tag = { box: Phaser.GameObjects.Container; label: Phaser.GameObjects.Text; plate: Phaser.GameObjects.Graphics };
 
 type SceneData = { session: Session; onReady: () => void; onError: (e: Error) => void };
 
@@ -23,9 +28,8 @@ class TownScene extends Phaser.Scene {
   private sprites = new Map<string, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse }>();
   private ring!: Phaser.GameObjects.Graphics;
   private resident!: Phaser.GameObjects.Container;
-  private residentTag!: Phaser.GameObjects.Container; // 名札（人物より手前の層に置き、主人公に隠れないようにする）
-  private residentLabel!: Phaser.GameObjects.Text;
-  private residentPlate!: Phaser.GameObjects.Graphics;
+  private tags = new Map<SpotId, Tag>(); // 名札（人物より手前の層に置き、主人公に隠れないようにする）
+  private part!: Phaser.GameObjects.Container; // 部品（仮）の印。依頼を受けている間だけ見せる
   private compact = false; // スマホ表示（名札を小さくし、拡大して描く）
   private zoom = 1; // 描く倍率。PC は 1。スマホは画面の細かさに合わせて上げ、文字や絵をぼやけさせない
   created = false;
@@ -65,9 +69,14 @@ class TownScene extends Phaser.Scene {
       });
     }
     this.resident = makeResident(this, this.session);
-    this.residentTag = makeResidentTag(this, this.session);
-    this.residentLabel = this.residentTag.getByName("label") as Phaser.GameObjects.Text;
-    this.residentPlate = this.residentTag.getByName("plate") as Phaser.GameObjects.Graphics;
+    this.part = makePart(this);
+    const r = this.session.resident;
+    this.tags.set("resident", makeTag(this, { x: r.pos.x, y: r.pos.y - WALK_HEIGHT - LABEL_GAP }, r.name));
+    this.tags.set("shop", makeTag(this, SHOP_TAG, SHOP.name));
+    // 部品の名札は地面に置いた物の札なので、人物より奥の層に描く（そばに立つと主人公が札の手前に来る）
+    this.tags.set("part", makeTag(this, { x: PART.pos.x, y: PART.pos.y - PART_TAG_GAP }, PART.name));
+    this.tags.get("part")!.box.setDepth(1.3);
+    this.showPart();
     this.applyLook();
     this.textures.addCanvas("foreground", makeForeground(this.textures.get(town.background).getSourceImage() as HTMLImageElement, this.session));
     this.add.image(0, 0, "foreground").setOrigin(0, 0).setDepth(3);
@@ -77,10 +86,22 @@ class TownScene extends Phaser.Scene {
     this.hooks.onReady();
   }
 
-  // 名札がいま描かれている範囲（論理座標）。住民を選ぶタップの当たり判定に使う
-  tagBounds(): Rect {
-    const b = this.residentLabel.getBounds();
-    return { x: b.x, y: b.y, w: b.width, h: b.height };
+  // 名札がいま描かれている範囲（論理座標）。住民・スクーター修理・部品を選ぶタップの当たり判定に使う（見えている名札だけ）
+  tagBounds(): Tags {
+    const out: Tags = {};
+    this.tags.forEach((t, id) => {
+      if (!t.box.visible) return;
+      const b = t.label.getBounds();
+      out[id] = { x: b.x, y: b.y, w: b.width, h: b.height };
+    });
+    return out;
+  }
+
+  // 部品は依頼を受けている間だけ置く（拾ったら消す）
+  private showPart() {
+    const on = partPlaced(this.session.errand);
+    this.part.setVisible(on);
+    this.tags.get("part")!.box.setVisible(on);
   }
 
   // スマホとPCで見た目を切り替える（倍率が変わったときも呼ぶ）。描き始める前に呼んでもよい
@@ -92,20 +113,22 @@ class TownScene extends Phaser.Scene {
 
   // スマホ：小さめの文字を角丸の札に載せる（街の看板になじむ色）。PC：これまでの名札
   private applyLook() {
-    const t = this.residentLabel;
-    t.setResolution(this.zoom);
-    if (this.compact) {
-      t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2).setY(-WALK_HEIGHT - LABEL_GAP);
-      this.residentPlate.setVisible(true);
-      this.drawPlate(this.session.nearResident);
-    } else {
-      t.setFontSize(22).setPadding(10, 4, 10, 4).setY(-WALK_HEIGHT - LABEL_GAP);
-      this.residentPlate.clear().setVisible(false);
-    }
+    this.tags.forEach((tag, id) => {
+      const t = tag.label;
+      t.setResolution(this.zoom);
+      if (this.compact) {
+        t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2);
+        tag.plate.setVisible(true);
+        this.drawPlate(tag, this.session.nearSpot === id);
+      } else {
+        t.setFontSize(22).setPadding(10, 4, 10, 4);
+        tag.plate.clear().setVisible(false);
+      }
+    });
   }
 
-  private drawPlate(near: boolean) {
-    const t = this.residentLabel, w = t.width, h = t.height, g = this.residentPlate;
+  private drawPlate(tag: Tag, near: boolean) {
+    const t = tag.label, w = t.width, h = t.height, g = tag.plate;
     g.clear().fillStyle(near ? 0xf3d88f : 0xfbf7ec, near ? 0.95 : 0.82).fillRoundedRect(-w / 2, t.y - h, w, h, h / 2)
       .lineStyle(1.5, 0x254b43, 0.55).strokeRoundedRect(-w / 2, t.y - h, w, h, h / 2);
   }
@@ -128,8 +151,12 @@ class TownScene extends Phaser.Scene {
     });
     // 仮の住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
     this.resident.setDepth(s.resident.pos.y < sim.pos.y ? 1.5 : 2.9);
-    if (this.compact) this.drawPlate(s.nearResident);
-    else this.residentLabel.setBackgroundColor(s.nearResident ? "#f3d88f" : "#fbf7ec");
+    if (this.part.visible !== partPlaced(s.errand)) this.showPart();
+    this.tags.forEach((tag, id) => {
+      const near = s.nearSpot === id;
+      if (this.compact) this.drawPlate(tag, near);
+      else tag.label.setBackgroundColor(near ? "#f3d88f" : "#fbf7ec");
+    });
     this.ring.clear();
     if (sim.target) this.ring.lineStyle(3, sim.blocked ? 0xeab86b : 0xfff9d2, 1).strokeCircle(sim.target.x, sim.target.y, 13);
   }
@@ -144,15 +171,31 @@ function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Conta
   return scene.add.container(pos.x, pos.y, [shadow, img]).setDepth(1.5);
 }
 
-// 住民の名札。人物・手前の植栽より上の層（深さ 3.5）に描くので、主人公が手前に来ても隠れない（目標の輪は 4 で、さらに上）
-function makeResidentTag(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Container {
-  const { pos, name } = s.resident;
-  const label = scene.add.text(0, -WALK_HEIGHT - LABEL_GAP, name, {
+// 部品（仮）の印。本番の絵ができるまでの仮で、地面に置いた真鍮色の歯車と、ゆっくり明滅する輪を描く（人物より奥の層）
+function makePart(scene: Phaser.Scene): Phaser.GameObjects.Container {
+  const g = scene.add.graphics();
+  const teeth: Phaser.Math.Vector2[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8, r = i % 2 ? 15 : 21;
+    teeth.push(new Phaser.Math.Vector2(Math.cos(a) * r, Math.sin(a) * r * 0.6 - 10));
+  }
+  g.fillStyle(0x243e35, 0.27).fillEllipse(0, 0, 50, 16)
+    .fillStyle(0xc0903a, 1).fillPoints(teeth, true).lineStyle(2, 0x5a3d16, 0.95).strokePoints(teeth, true)
+    .fillStyle(0x5a3d16, 1).fillEllipse(0, -10, 12, 7);
+  const glow = scene.add.graphics().lineStyle(2, 0xfff3c4, 1).strokeEllipse(0, -6, 66, 34);
+  scene.tweens.add({ targets: glow, alpha: { from: 0.9, to: 0.15 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+  return scene.add.container(PART.pos.x, PART.pos.y, [glow, g]).setDepth(1.2);
+}
+
+// 名札。人物・手前の植栽より上の層（深さ 3.5）に描くので、主人公が手前に来ても隠れない（目標の輪は 4 で、さらに上）。
+// at は名札の下端の中央
+function makeTag(scene: Phaser.Scene, at: { x: number; y: number }, name: string): Tag {
+  const label = scene.add.text(0, 0, name, {
     fontFamily: '"Noto Sans JP", "Hiragino Sans", sans-serif', fontSize: "22px", color: "#254b43", backgroundColor: "#fbf7ec",
     padding: { x: 10, y: 4 }
-  }).setOrigin(0.5, 1).setName("label");
-  const plate = scene.add.graphics().setName("plate").setVisible(false); // スマホの角丸の名札（文字の後ろ）
-  return scene.add.container(pos.x, pos.y, [plate, label]).setDepth(3.5);
+  }).setOrigin(0.5, 1);
+  const plate = scene.add.graphics().setVisible(false); // スマホの角丸の名札（文字の後ろ）
+  return { box: scene.add.container(at.x, at.y, [plate, label]).setDepth(3.5), label, plate };
 }
 
 // 背景から手前の植栽だけを切り抜いた透過画像。人物の上に重ねて「植栽の奥にいる」ように見せる
@@ -169,7 +212,7 @@ function makeForeground(bg: CanvasImageSource, s: Session): HTMLCanvasElement {
 }
 
 // マウス（ポインター）を押している間だけ、押している地点を目標にする。離す・取り消し・フォーカス喪失で止まる
-function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Rect): () => void {
+function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Tags): () => void {
   let id: number | null = null;
   const toWorld = (e: PointerEvent): Point => {
     const r = el.getBoundingClientRect(), v = s.view;
@@ -178,8 +221,8 @@ function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Rect): 
   const down = (e: PointerEvent) => {
     if (id !== null || e.button !== 0) return;
     e.preventDefault();
-    // スマホでは住民をタップすると選ぶだけにし、歩き出さない（PC はこれまでどおり押した所へ歩く）
-    if (window.matchMedia(PHONE_QUERY).matches && s.tapResident(toWorld(e), tagBounds())) return;
+    // スマホでは住民・スクーター修理・部品をタップすると選ぶだけにし、歩き出さない（PC はこれまでどおり押した所へ歩く）
+    if (window.matchMedia(PHONE_QUERY).matches && s.tapSpot(toWorld(e), tagBounds())) return;
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
     s.press(toWorld(e));
