@@ -38,6 +38,7 @@ export class Session {
   // 閉じたら同じ位置・同じカメラから続ける（作り直さない）
   pause() { this.paused = true; this.sim.halt(); }
   resume() { this.paused = false; }
+  get isPaused() { return this.paused; } // 会話や説明を開いている間（描く側が頭上の表示を隠すのに使う）
 
   // 押している地点を伝える。止めている間は受け付けない
   // 地面を押したら住民の選択は外す
@@ -47,6 +48,12 @@ export class Session {
     this.setSelected(null);
   }
   release() { this.sim.release(); }
+  // 目的地を決めて歩く（タップした場所まで歩いて止まる。体験見本の操作）。止めている間は受け付けない
+  goTo(p: Point) {
+    if (this.paused) return;
+    this.sim.goTo(p);
+    this.setSelected(null);
+  }
 
   // 近くでタップした場所の会話・発見の画面を開く窓口（画面側が設定する）
   onOpen: ((id: SpotId) => void) | null = null;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TOWN } from "../test/town";
 import { WALK } from "./motion";
 import { Sim } from "./sim";
-import { allowed } from "./world";
+import { allowed, DEAD_ZONE } from "./world";
 
 const run = (s: Sim, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.step(dt); };
 
@@ -64,5 +64,64 @@ describe("徒歩の移動", () => {
     const at = s.pos.x;
     s.step(5);
     expect(s.pos.x - at).toBeLessThanOrEqual(WALK.walkSpeed * 0.05 + 1e-9);
+  });
+});
+
+describe("目的地を決めて歩く（goTo：タップした場所まで歩く）", () => {
+  it("離さなくても目的地まで歩き、着いたら止まって目的地を消す", () => {
+    const s = new Sim(TOWN), to = { x: TOWN.spawn.x + 200, y: TOWN.spawn.y };
+    s.goTo(to);
+    run(s, 3);
+    expect(Math.hypot(s.pos.x - to.x, s.pos.y - to.y)).toBeLessThan(DEAD_ZONE + 1);
+    expect(s.target).toBeNull();
+    expect(s.moving).toBe(false);
+  });
+  it("斜めの目的地でも、手前で止まったまま「向かっている」状態が残らない（実測：1080,510 へ向かうと 9.0000…で止まった）", () => {
+    const s = new Sim(TOWN);
+    s.pos = { x: 824.2776578946218, y: 552.6577987715784 }; // 見本で実際に歩き始めた位置
+    s.goTo({ x: 1080, y: 510 });
+    run(s, 4);
+    expect(s.moving).toBe(false);
+    expect(s.target).toBeNull();
+  });
+  it("歩ける範囲の外を目的地にしても、壁で止まって目的地を消す（押し続けない）", () => {
+    const s = new Sim(TOWN);
+    s.goTo({ x: TOWN.spawn.x, y: 0 });
+    run(s, 8);
+    expect(s.target).toBeNull();
+    expect(s.moving).toBe(false);
+  });
+  it("途中で別の場所を押すと、そちらへ行き先が変わる", () => {
+    const s = new Sim(TOWN), a = { x: TOWN.spawn.x + 200, y: TOWN.spawn.y }, b = { x: TOWN.spawn.x - 200, y: TOWN.spawn.y };
+    s.goTo(a);
+    run(s, 0.5);
+    s.goTo(b);
+    run(s, 4);
+    expect(Math.hypot(s.pos.x - b.x, s.pos.y - b.y)).toBeLessThan(DEAD_ZONE + 1);
+  });
+  it("halt（会話を開くなど）で目的地も消え、再開しても勝手に歩き出さない", () => {
+    const s = new Sim(TOWN);
+    s.goTo({ x: TOWN.spawn.x + 200, y: TOWN.spawn.y });
+    run(s, 0.3);
+    s.halt();
+    const at = { ...s.pos };
+    run(s, 1);
+    expect(s.target).toBeNull();
+    expect(s.pos).toEqual(at);
+  });
+});
+
+describe("相手の方を向く（faceToward：会話を始めたとき）", () => {
+  it("止まったまま、相手のいる方向へ向きだけ変える", () => {
+    const s = new Sim(TOWN);
+    const at = { ...s.pos };
+    s.faceToward({ x: at.x - 80, y: at.y }); // 左にいる相手
+    expect(s.heading).toBe("w");
+    expect(s.facing).toBe(-1);
+    s.faceToward({ x: at.x + 60, y: at.y - 60 }); // 右上にいる相手
+    expect(s.heading).toBe("ne");
+    expect(s.facing).toBe(1);
+    expect(s.pos).toEqual(at);
+    expect(s.moving).toBe(false);
   });
 });
