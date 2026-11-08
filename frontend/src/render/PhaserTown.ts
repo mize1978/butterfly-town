@@ -287,21 +287,21 @@ function makeForeground(bg: CanvasImageSource, s: Session): HTMLCanvasElement {
   return c;
 }
 
-// マウス（ポインター）を押している間だけ、押している地点を目標にする。離す・取り消し・フォーカス喪失で止まる
-// 体験見本（encounter）の指の扱い：短く押して離す（タップ）と、その場所まで歩いて止まる。
-// 押し続けている間は、毎フレーム「いま指の下にある地点」を目標にし直す（カメラが動いても指の方向へ歩き続ける）。
-// 途中で別の場所を押せば、行き先が変わる。本編（encounter でない）は従来どおり「押している間だけ歩く」
+// 歩く操作（本編・体験見本で共通）：短く押して離す（タップ・クリック）と、その場所まで歩いて止まる。
+// 押し続けている間は、毎フレーム「いま指の下にある地点」を目標にし直す（カメラが動いても指の方向へ歩き続ける）。離すと減速して止まる。
+// 途中で別の場所を押せば、行き先が変わる。取り消し・フォーカス喪失では止まる。
+// 住民・スクーター修理・部品（絵と名札）を押したときは、歩く入力にせず「選ぶ・開く」だけにする（PC・スマホ共通）
 const TAP_MS = 250; // これより短く押して離したらタップ
 const TAP_MOVE = 12; // 押してから離すまでにこれより動かなければタップ（px）
 
-function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Tags, encounter = false): () => void {
+function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Tags): () => void {
   let id: number | null = null;
   let start = { t: 0, x: 0, y: 0 }, last = { x: 0, y: 0 }, raf = 0;
   const toWorld = (p: { clientX: number; clientY: number }): Point => {
     const r = el.getBoundingClientRect(), v = s.view;
     return { x: v.x + ((p.clientX - r.left) / r.width) * v.w, y: v.y + ((p.clientY - r.top) / r.height) * v.h };
   };
-  // 押し続けている間、指の下の地点を毎フレーム目標にし直す（体験見本だけ）
+  // 押し続けている間、指の下の地点を毎フレーム目標にし直す
   const follow = () => {
     if (id === null) return;
     s.press(toWorld({ clientX: last.x, clientY: last.y }));
@@ -310,28 +310,25 @@ function bindPointer(el: HTMLCanvasElement, s: Session, tagBounds: () => Tags, e
   const down = (e: PointerEvent) => {
     if (id !== null || e.button !== 0) return;
     e.preventDefault();
-    // スマホでは住民・スクーター修理・部品をタップすると選ぶだけにし、歩き出さない（PC はこれまでどおり押した所へ歩く）
-    if ((encounter || window.matchMedia(PHONE_QUERY).matches) && s.tapSpot(toWorld(e), tagBounds())) return;
+    // 住民・スクーター修理・部品を押したら、近ければ開き、遠ければ選ぶだけ。歩き出さない
+    if (s.tapSpot(toWorld(e), tagBounds())) return;
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
     s.press(toWorld(e));
-    if (encounter) {
-      start = { t: performance.now(), x: e.clientX, y: e.clientY };
-      last = { x: e.clientX, y: e.clientY };
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(follow);
-    }
+    start = { t: performance.now(), x: e.clientX, y: e.clientY };
+    last = { x: e.clientX, y: e.clientY };
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(follow);
   };
   const move = (e: PointerEvent) => {
     if (id !== e.pointerId) return;
-    if (encounter) last = { x: e.clientX, y: e.clientY };
-    else s.press(toWorld(e));
+    last = { x: e.clientX, y: e.clientY };
   };
   const up = (e: PointerEvent) => {
     if (id !== e.pointerId) return;
     id = null;
     cancelAnimationFrame(raf);
-    const tap = encounter && e.type === "pointerup"
+    const tap = e.type === "pointerup"
       && performance.now() - start.t < TAP_MS && Math.hypot(e.clientX - start.x, e.clientY - start.y) < TAP_MOVE;
     if (tap) s.goTo(toWorld(e)); // タップ：離しても、その場所まで歩く
     else s.release();
@@ -393,7 +390,7 @@ export class PhaserTown {
           encounter: this.encounter,
           onReady: () => {
             if (this.dead) return;
-            this.unbind = bindPointer(game.canvas, session, () => scene.tagBounds(), this.encounter);
+            this.unbind = bindPointer(game.canvas, session, () => scene.tagBounds());
             // 画面の回転・大きさの変更に合わせて、映す大きさと描く大きさを揃え直す（人物の位置と街の状態はそのまま）
             this.observer = new ResizeObserver(() => {
               const next = layoutFor(parent, session);

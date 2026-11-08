@@ -45,7 +45,7 @@ function usePhone(): boolean {
   );
 }
 
-// スマホの「行きたい方向を長押しすると歩きます」は初回だけ出す。一度歩いたらこのブラウザでは次から出さない
+// スマホの「行きたい場所をタップすると歩きます」は初回だけ出す。一度歩いたらこのブラウザでは次から出さない
 // （遊びの進行ではなく画面の案内の記録。保存できない環境では毎回出るだけで、止まらない）
 const WALK_HINT_KEY = "butterfly-town.walk-hint-seen";
 function walkHintSeen(): boolean { try { return localStorage.getItem(WALK_HINT_KEY) === "1"; } catch { return false; } }
@@ -160,7 +160,7 @@ export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
                 // 近くにいる間は「タップすると話せます」と添える。移動の説明は初回だけ
                 <div className="town-actions">
                   <p className="hint" id="talk-hint" aria-live="polite">
-                    {selected && near !== selected ? `${approach(selected)}。` : near ? `${tapToDo(near)}。` : !walked && !hintSeen ? "行きたい方向を長押しすると歩きます。" : ""}
+                    {selected && near !== selected ? `${approach(selected)}。` : near ? `${tapToDo(near)}。` : !walked && !hintSeen ? "行きたい場所をタップすると歩きます。長押しで歩き続けます。" : ""}
                   </p>
                 </div>
               ) : (
@@ -169,8 +169,8 @@ export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
                     {verb(near)} →
                   </button>
                   <p className="hint" id="talk-hint">
-                    {near ? `${canDo(near)}。` : `${session.resident.name}やスクーター修理に近づくと話せます。`}
-                    行きたい方向を長押しすると歩きます。
+                    {selected && near !== selected ? `${approach(selected)}。` : near ? `${canDo(near)}。` : `${session.resident.name}やスクーター修理に近づくと話せます。`}
+                    行きたい場所をクリックすると歩きます（長押しで歩き続けます）。
                   </p>
                 </div>
               )}
