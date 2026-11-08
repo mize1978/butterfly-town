@@ -4,7 +4,7 @@ import { WALK } from "../core/motion";
 import { Sim } from "../core/sim";
 import { walkerActors, type Actor } from "../core/walker";
 import type { Point, Town } from "../core/world";
-import { advance, partPlaced, PART, SHOP, type Errand, type ErrandStep, type Spot, type SpotId } from "./errand";
+import { partSpot, partsInTown, SHOP, START, type Outcome, type Repair, type Spot, type SpotId } from "./errand";
 import { hitsResident, hitsTag, SAMPLE_RESIDENT, TALK_RANGE, type Rect, type SampleResident } from "./sample-resident";
 
 // 描いている名札の範囲（論理座標）。タップで選ぶ当たり判定に足す
@@ -17,7 +17,7 @@ export class Session {
   private paused = false;
   private near: SpotId | null = null; // 話せる（調べられる）距離にいる場所。複数なら一番近いところ
   private selected: SpotId | null = null; // タップして選んでいる場所（スマホで「話す」「調べる」を出す条件）
-  private errandState: Errand = "offered"; // スクーター修理の依頼の進み具合（保存しない）
+  private repairState: Repair = START; // スクーター修理の依頼と修理の進み具合（保存しない）
   private walked = false; // 一度でも歩いたか（スマホの移動の説明を消す条件）
   private listeners = new Set<() => void>();
 
@@ -73,7 +73,7 @@ export class Session {
   // 近づいて使える場所（いま街にあるもの）。住民とスクーター修理はいつも、部品は依頼を受けて拾うまでの間だけ
   spots(): Spot[] {
     const r: Spot = { id: "resident", name: this.resident.name, pos: this.resident.pos, hit: { x: 0, y: 0, w: 0, h: 0 } };
-    return partPlaced(this.errandState) ? [r, SHOP, PART] : [r, SHOP];
+    return [r, SHOP, ...partsInTown(this.repairState).map(partSpot)];
   }
 
   // 話せる（調べられる）距離にいる場所。変わったときだけ subscribe の相手に知らせる（React の useSyncExternalStore 用）
@@ -97,15 +97,17 @@ export class Session {
     this.notify();
   }
 
-  // スクーター修理の依頼。決まった順にだけ進み（依頼を受ける → 部品を受け取る → 部品を渡す）、保存はしない
-  get errand() { return this.errandState; }
-  step(step: ErrandStep) {
-    const next = advance(this.errandState, step);
-    if (next === this.errandState) return;
-    this.errandState = next;
-    if (this.selected === "part" && !partPlaced(next)) this.selected = null;
+  // スクーター修理の依頼と修理。errand.ts の操作（accept・collect・place など）を渡して進める。
+  // 合わない操作は状態を変えず、理由の文を返す。保存はしない
+  get repair() { return this.repairState; }
+  act(op: (r: Repair) => Outcome): Outcome {
+    const out = op(this.repairState);
+    if (!out.ok) return out;
+    this.repairState = out.next;
+    if (this.selected && !this.spots().some((s) => s.id === this.selected)) this.selected = null; // 拾って街から消えた部品の選択は外す
     this.notify();
     this.updateNear(); // 部品が置かれた・なくなったので、近くにいる場所を測り直す
+    return out;
   }
 
   tick(dt: number) {

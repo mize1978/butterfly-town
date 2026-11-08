@@ -3,7 +3,7 @@ import Phaser from "phaser";
 import { measuredRects, SPRITE_FILES, WALK_HEIGHT } from "../core/appearance";
 import type { Point } from "../core/world";
 import type { Session, Tags } from "../game/session";
-import { PART, partPlaced, SHOP, type SpotId } from "../game/errand";
+import { PART_IDS, PARTS, partSpotId, partsInTown, SHOP, type PartId, type Repair, type SpotId } from "../game/errand";
 import { VIEW_SIZE, type ViewSize } from "../core/camera";
 import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
@@ -29,7 +29,8 @@ class TownScene extends Phaser.Scene {
   private ring!: Phaser.GameObjects.Graphics;
   private resident!: Phaser.GameObjects.Container;
   private tags = new Map<SpotId, Tag>(); // 名札（人物より手前の層に置き、主人公に隠れないようにする）
-  private part!: Phaser.GameObjects.Container; // 部品（仮）の印。依頼を受けている間だけ見せる
+  private parts = new Map<PartId, Phaser.GameObjects.Container>(); // 部品の印。依頼を受けてから拾うまでの間だけ見せる
+  private shownFor: Repair | null = null; // 部品の見せ方を合わせた時点の状態（変わったときだけ合わせ直す）
   private compact = false; // スマホ表示（名札を小さくし、拡大して描く）
   private zoom = 1; // 描く倍率。PC は 1。スマホは画面の細かさに合わせて上げ、文字や絵をぼやけさせない
   created = false;
@@ -69,14 +70,17 @@ class TownScene extends Phaser.Scene {
       });
     }
     this.resident = makeResident(this, this.session);
-    this.part = makePart(this);
+    for (const id of PART_IDS) this.parts.set(id, makePart(this, id));
     const r = this.session.resident;
     this.tags.set("resident", makeTag(this, { x: r.pos.x, y: r.pos.y - WALK_HEIGHT - LABEL_GAP }, r.name));
     this.tags.set("shop", makeTag(this, SHOP_TAG, SHOP.name));
     // 部品の名札は地面に置いた物の札なので、人物より奥の層に描く（そばに立つと主人公が札の手前に来る）
-    this.tags.set("part", makeTag(this, { x: PART.pos.x, y: PART.pos.y - PART_TAG_GAP }, PART.name));
-    this.tags.get("part")!.box.setDepth(1.3);
-    this.showPart();
+    for (const id of PART_IDS) {
+      const { pos, name } = PARTS[id];
+      this.tags.set(partSpotId(id), makeTag(this, { x: pos.x, y: pos.y - PART_TAG_GAP }, name));
+      this.tags.get(partSpotId(id))!.box.setDepth(1.3);
+    }
+    this.showParts();
     this.applyLook();
     this.textures.addCanvas("foreground", makeForeground(this.textures.get(town.background).getSourceImage() as HTMLImageElement, this.session));
     this.add.image(0, 0, "foreground").setOrigin(0, 0).setDepth(3);
@@ -97,11 +101,15 @@ class TownScene extends Phaser.Scene {
     return out;
   }
 
-  // 部品は依頼を受けている間だけ置く（拾ったら消す）
-  private showPart() {
-    const on = partPlaced(this.session.errand);
-    this.part.setVisible(on);
-    this.tags.get("part")!.box.setVisible(on);
+  // 部品は依頼を受けてから、拾うまでの間だけ置く（拾ったら消す）
+  private showParts() {
+    const r = this.session.repair, inTown = partsInTown(r);
+    this.shownFor = r;
+    for (const id of PART_IDS) {
+      const on = inTown.includes(id);
+      this.parts.get(id)!.setVisible(on);
+      this.tags.get(partSpotId(id))!.box.setVisible(on);
+    }
   }
 
   // スマホとPCで見た目を切り替える（倍率が変わったときも呼ぶ）。描き始める前に呼んでもよい
@@ -151,7 +159,7 @@ class TownScene extends Phaser.Scene {
     });
     // 仮の住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
     this.resident.setDepth(s.resident.pos.y < sim.pos.y ? 1.5 : 2.9);
-    if (this.part.visible !== partPlaced(s.errand)) this.showPart();
+    if (this.shownFor !== s.repair) this.showParts();
     this.tags.forEach((tag, id) => {
       const near = s.nearSpot === id;
       if (this.compact) this.drawPlate(tag, near);
@@ -171,8 +179,9 @@ function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Conta
   return scene.add.container(pos.x, pos.y, [shadow, img]).setDepth(1.5);
 }
 
-// 部品（仮）の印。本番の絵ができるまでの仮で、地面に置いた真鍮色の歯車と、ゆっくり明滅する輪を描く（人物より奥の層）
-function makePart(scene: Phaser.Scene): Phaser.GameObjects.Container {
+// 部品の印。本番の絵ができるまでの仮で、地面に置いた真鍮色の歯車と、ゆっくり明滅する輪を描く（人物より奥の層）。
+// 4つとも同じ印で、名札（後輪・駆動ベルトなど）で見分ける
+function makePart(scene: Phaser.Scene, id: PartId): Phaser.GameObjects.Container {
   const g = scene.add.graphics();
   const teeth: Phaser.Math.Vector2[] = [];
   for (let i = 0; i < 16; i++) {
@@ -184,7 +193,8 @@ function makePart(scene: Phaser.Scene): Phaser.GameObjects.Container {
     .fillStyle(0x5a3d16, 1).fillEllipse(0, -10, 12, 7);
   const glow = scene.add.graphics().lineStyle(2, 0xfff3c4, 1).strokeEllipse(0, -6, 66, 34);
   scene.tweens.add({ targets: glow, alpha: { from: 0.9, to: 0.15 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-  return scene.add.container(PART.pos.x, PART.pos.y, [glow, g]).setDepth(1.2);
+  const { pos } = PARTS[id];
+  return scene.add.container(pos.x, pos.y, [glow, g]).setDepth(1.2);
 }
 
 // 名札。人物・手前の植栽より上の層（深さ 3.5）に描くので、主人公が手前に来ても隠れない（目標の輪は 4 で、さらに上）。
