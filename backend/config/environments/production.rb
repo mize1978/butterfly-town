@@ -13,7 +13,9 @@ Rails.application.configure do
   config.consider_all_requests_local = false
 
   # Cache assets for far-future expiry since they are all digest stamped.
-  config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
+  # 画面の静的ファイル（Vite のビルド結果）も Rails が配る。index.html は名前が変わらないので、
+  # 長く保存させると新しい版が届かない。毎回 更新の有無を確かめさせる（変わっていなければ 304 で軽く返る）
+  config.public_file_server.headers = { "cache-control" => "public, no-cache" }
 
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"

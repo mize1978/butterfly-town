@@ -1,0 +1,25 @@
+# 初回デプロイの候補：Render（Docker の Web サービス＋PostgreSQL）。デプロイ先は README で「AWS と PaaS を比較中」のため未決定。
+# この設定で作るときは、Render のダッシュボードで「Blueprint」からこのリポジトリを選ぶ（作成・課金の確認はみぜが行う）。
+services:
+  - type: web
+    name: butterfly-town
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /up
+    autoDeploy: false # main へのマージで自動では出さない。CI が通ったのを見てから手動で出す
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: butterfly-town-db
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_MAX_THREADS
+        value: "5"
+      # AI の API キーは、実LLMの Issue で追加する（画面には渡さない。Rails の環境変数だけに置く）
+
+databases:
+  - name: butterfly-town-db
+    plan: basic-256mb
+    postgresMajorVersion: "17"

@@ -1,0 +1,13 @@
+# イメージに入れないもの
+.git
+.github
+**/node_modules
+**/dist
+**/coverage
+**/.env*
+backend/config/master.key
+backend/log/*
+backend/tmp/*
+backend/storage/*
+# 素材は権利条件が未確認のため入れない（入れるかどうかは公開前にみぜが決める）
+frontend/public/art
