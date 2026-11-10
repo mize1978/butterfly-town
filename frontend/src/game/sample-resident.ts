@@ -16,8 +16,11 @@ export const RESIDENT_HIT = { halfW: 40, top: 210, bottom: 16 } as const;
 export const TAG_PAD = 6;
 export function hitsResident(r: SampleResident, p: Point, tag?: Rect): boolean {
   const body = Math.abs(p.x - r.pos.x) <= RESIDENT_HIT.halfW && p.y >= r.pos.y - RESIDENT_HIT.top && p.y <= r.pos.y + RESIDENT_HIT.bottom;
-  const onTag = !!tag && p.x >= tag.x - TAG_PAD && p.x <= tag.x + tag.w + TAG_PAD && p.y >= tag.y - TAG_PAD && p.y <= tag.y + tag.h + TAG_PAD;
-  return body || onTag;
+  return body || hitsTag(p, tag);
+}
+// 名札（周りを TAG_PAD 広げた範囲）に当たったか
+export function hitsTag(p: Point, tag?: Rect): boolean {
+  return !!tag && p.x >= tag.x - TAG_PAD && p.x <= tag.x + tag.w + TAG_PAD && p.y >= tag.y - TAG_PAD && p.y <= tag.y + tag.h + TAG_PAD;
 }
 
 export const SAMPLE_RESIDENT: SampleResident = {

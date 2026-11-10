@@ -4,10 +4,13 @@ import { classify, type Dir } from "./direction";
 import { WALK, type Tuning } from "./motion";
 import { DEAD_ZONE, MAX_DT, moveAlong, type Point, type Town } from "./world";
 
+const ARRIVE = 0.5; // goTo の目的地に着いたとみなす、止まる線からのゆとり
+
 export class Sim {
   pos: Point;
   facing: 1 | -1 = 1;
-  target: Point | null = null; // マウスを押している間だけ値を持つ
+  target: Point | null = null; // マウスを押している間（または goTo で目的地へ向かう間）だけ値を持つ
+  private going = false; // goTo の目的地へ向かっている（着いたら・進めなくなったら止まる）
   moving = false;
   blocked = false;
   speed = 0;
@@ -21,11 +24,20 @@ export class Sim {
     this.pos = { ...town.spawn };
   }
 
-  press(p: Point) { this.target = p; }
+  press(p: Point) { this.target = p; this.going = false; }
+  // 目的地を決めて歩く（離しても止まらない）。着く・壁で進めなくなる・別の入力で終わる
+  goTo(p: Point) { this.target = p; this.going = true; }
   // 入力を離す。離した後も減速しながら少し進んでから止まる
-  release() { this.target = null; }
+  release() { this.target = null; this.going = false; }
+  // 止まったまま、p の方へ向き直る（会話を始めたとき相手の方を向く）。歩いていても向きだけ変える
+  faceToward(p: Point) {
+    const dx = p.x - this.pos.x, dy = p.y - this.pos.y;
+    if (Math.hypot(dx, dy) < 1) return;
+    this.heading = classify(dx, dy, this.heading);
+    if (Math.abs(dx) > 1) this.facing = dx < 0 ? -1 : 1;
+  }
   // 減速せずその場で止める（画面の切り替えなど）
-  halt() { this.target = null; this.speed = 0; this.speedRatio = 0; }
+  halt() { this.target = null; this.going = false; this.speed = 0; this.speedRatio = 0; }
 
   // 最高速度まで accel 秒で加速し、離すと decel 秒で減速して止まる。押している地点の近くでは行き過ぎないよう手前から減速する
   step(dt: number) {
@@ -36,7 +48,8 @@ export class Sim {
     if (this.target) {
       const dx = this.target.x - this.pos.x, dy = this.target.y - this.pos.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > 10) this.facing = dx < 0 ? -1 : 1;
-      if (d < DEAD_ZONE) this.speed = 0;
+      // 目的地へ向かうとき、減速は止まる線（DEAD_ZONE）へ近づき続けて越えないので、線の 0.5 手前で「着いた」とみなす
+      if (d < DEAD_ZONE || (this.going && d < DEAD_ZONE + ARRIVE)) { this.speed = 0; if (this.going) { this.target = null; this.going = false; } }
       else {
         this.dir = { x: dx / d, y: dy / d };
         room = d - DEAD_ZONE;
@@ -48,6 +61,7 @@ export class Sim {
     const dist = Math.min(this.speed * dt, room);
     const next = dist > 0 ? moveAlong(this.town, this.pos, this.dir.x, this.dir.y, dist) : { ...this.pos, moved: 0, blocked: false };
     this.blocked = next.blocked;
+    if (this.going && next.blocked && next.moved < 0.01) { this.target = null; this.going = false; } // 目的地へ進めなくなったら止まる
     this.pos = { x: next.x, y: next.y };
     this.moving = next.moved > 0.01;
     this.stillFor = this.moving ? 0 : this.stillFor + dt;

@@ -214,3 +214,161 @@ p { margin: 0; }
   .talk-buttons { width: auto; }
   .talk-buttons .btn { flex: none; min-width: 96px; min-height: 44px; }
 }
+
+/* S11 作業台（修理パズル）：街の上に重ねる。開いている間、街は止まっている。
+   PC は左に部品・右にスクーター。スマホは上に部品を横一列、下にスクーター。部品・取り付け位置・ボタンは押しやすい大きさ（44px 以上） */
+.bench-layer { position: absolute; inset: 0; background: rgba(37, 75, 67, .32); display: flex; justify-content: center; align-items: center; padding: 12px 16px; z-index: 10; }
+.bench { width: min(980px, 100%); max-height: 100%; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2); padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 10px; }
+.bench-head { display: flex; align-items: center; gap: 10px; }
+.bench-head h2 { margin: 0; font-size: 20px; }
+.bench-close { margin-left: auto; min-height: 44px; }
+.bench-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-areas: "tray stage" "tray note" "tray actions"; gap: 8px 16px; align-items: start; }
+.bench-tray { grid-area: tray; background: var(--field); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.bench-count { margin: 0; font-size: 13px; color: var(--muted); }
+.bench-parts { display: flex; flex-direction: column; gap: 6px; }
+.bench-part { font: inherit; display: grid; grid-template-columns: 52px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left;
+  min-height: 60px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: grab; touch-action: none; user-select: none; }
+.bench-part .part-art { grid-row: 1 / 3; width: 52px; height: 52px; pointer-events: none; }
+.bench-part-name { font-weight: 700; font-size: 14px; pointer-events: none; }
+.bench-part small { font-size: 12px; color: var(--muted); pointer-events: none; }
+.bench-part.selected { outline: 3px solid #5b9f87; background: #def1df; }
+.bench-part.installed { background: #d7e8d2; cursor: default; }
+.bench-part.dragging { opacity: .45; }
+.bench-part:disabled:not(.installed) { opacity: .5; cursor: default; }
+.bench-tools { display: flex; flex-direction: column; gap: 6px; }
+.bench-tools .btn { min-height: 44px; }
+.bench-hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--note); }
+.bench-stage { grid-area: stage; position: relative; aspect-ratio: 620 / 340; border-radius: 10px;
+  background: radial-gradient(ellipse at 50% 35%, #fffdf2, #eee8d7); }
+.bench-stage .scooter-drawing { width: 100%; height: 100%; display: block; }
+.bench-slot { position: absolute; font: inherit; font-size: 13px; min-height: 44px; padding: 4px 6px; border: 2px dashed #74a285; border-radius: 8px;
+  background: rgba(251, 255, 240, .88); color: #3d6b57; cursor: pointer; }
+.bench-slot.slot-wheel { left: 12%; top: 72%; width: 26%; }
+.bench-slot.slot-belt { left: 30%; top: 47%; width: 30%; }
+.bench-slot.slot-battery { left: 51%; top: 24%; width: 28%; }
+.bench-slot.slot-cover { left: 10%; top: 22%; width: 32%; }
+.bench-slot.filled { visibility: hidden; } /* はめた所は部品の絵が見えるよう、枠を消す */
+.bench-slot.over { outline: 4px solid rgba(222, 192, 106, .7); background: #ffe4a0; }
+.bench-note { grid-area: note; margin: 0; font-size: 15px; min-height: 1.6em; }
+.bench-note.error { color: var(--clay); }
+.bench-actions { grid-area: actions; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.bench-actions .btn { min-height: 44px; }
+.bench-ghost { position: fixed; z-index: 30; width: 64px; height: 64px; transform: translate(-50%, -50%); pointer-events: none; }
+.bench-ghost .part-art { width: 100%; height: 100%; }
+.bench-done { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 8px 0; }
+.bench-done .scooter-drawing { width: min(520px, 100%); }
+.bench-done-title { margin: 0; font-size: 20px; font-weight: 700; }
+.bench-done-note { margin: 0 0 6px; color: var(--note); }
+.bench-done .btn { min-height: 44px; min-width: 160px; }
+
+@media (max-width: 640px), (max-height: 480px) {
+  .bench-layer { padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
+  .bench { padding: 10px; gap: 6px; }
+  .bench-head { gap: 6px; }
+  .bench-head h2 { font-size: 15px; white-space: nowrap; }
+  .bench-head .talk-badge { font-size: 11px; white-space: nowrap; }
+  .bench-close { white-space: nowrap; padding: 0 12px; }
+  .bench-body { grid-template-columns: 1fr; grid-template-areas: "tray" "stage" "note" "actions"; gap: 6px; }
+  .bench-tray { padding: 6px; gap: 6px; }
+  .bench-parts { flex-direction: row; gap: 4px; }
+  .bench-part { flex: 1 1 0; min-width: 0; grid-template-columns: 1fr; grid-template-rows: auto auto auto; justify-items: center; text-align: center; padding: 4px 2px; row-gap: 0; }
+  .bench-part .part-art { grid-row: auto; width: 40px; height: 40px; }
+  .bench-part-name { font-size: 11px; }
+  .bench-part small { font-size: 10px; }
+  .bench-tools { flex-direction: row; align-items: center; gap: 8px; }
+  .bench-tools .btn { flex: 0 0 auto; }
+  .bench-hint { font-size: 12px; }
+  /* 取り付け位置はモックのスマホ版と同じ配置（押せる高さ 44px を保ったまま重ならない） */
+  .bench-slot { font-size: 10px; padding: 2px 3px; }
+  .bench-slot.slot-wheel { left: 4%; top: 72%; width: 35%; }
+  .bench-slot.slot-belt { left: 30%; top: 44%; width: 33%; }
+  .bench-slot.slot-battery { left: 56%; top: 17%; width: 35%; }
+  .bench-slot.slot-cover { left: 4%; top: 10%; width: 40%; }
+  .bench-note { font-size: 13px; }
+  .bench-actions { justify-content: stretch; }
+  .bench-actions .btn { flex: 1 1 auto; min-width: 0; font-size: 13px; padding: 0 6px; white-space: nowrap; }
+}
+/* 横向きのスマートフォン：高さが足りないので、左に部品を2列で並べ、スクーターの絵を少し小さくして1画面に収める */
+@media (max-height: 480px) and (min-width: 560px) {
+  .bench { padding: 8px 10px; gap: 4px; }
+  .bench-body { grid-template-columns: 240px minmax(0, 1fr); grid-template-areas: "tray stage" "tray note" "tray actions"; gap: 4px 10px; }
+  .bench-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .bench-part { grid-template-columns: 30px 1fr; grid-template-rows: auto auto; justify-items: start; text-align: left; min-height: 44px; padding: 2px 4px; column-gap: 4px; }
+  .bench-part .part-art { grid-row: 1 / 3; width: 30px; height: 30px; }
+  .bench-tools { flex-direction: column; align-items: stretch; gap: 4px; }
+  .bench-hint { font-size: 11px; }
+  .bench-stage { height: 45vh; width: auto; max-width: 100%; justify-self: center; } /* 縦横比は保ったまま（取り付け位置が絵とずれない） */
+  .bench-note { font-size: 12px; min-height: 0; }
+}
+
+/* S11 作業台：触れる見本（?bench=new）。スクーターを大きく、部品は下のトレーに大きく並べる。
+   動きは「触ったとおり」を優先：部品は指について動き（遅れなし）、近づいた位置が光り、はまると弾む。合わなければトレーへ戻る */
+.tbench { width: min(720px, 100%); max-height: 100%; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.tb-stage { position: relative; aspect-ratio: 620 / 340; border-radius: 12px; background: radial-gradient(ellipse at 50% 40%, #fffdf2, #ece5d2); touch-action: none; user-select: none; }
+.tb-stage .scooter-drawing, .tb-slots { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tb-slots { pointer-events: none; }
+.tb-slot > * { fill: rgba(255, 252, 240, .45); stroke: #6f9c84; stroke-width: 3; stroke-dasharray: 8 6; transition: fill .12s, stroke .12s; }
+.tb-stage.choosing .tb-slot > * { animation: tb-breathe 1.4s ease-in-out infinite; }
+.tb-slot.hot > * { fill: rgba(243, 216, 143, .75); stroke: #c79a2e; stroke-dasharray: none; animation: none; }
+@keyframes tb-breathe { 50% { fill: rgba(243, 216, 143, .4); } }
+.tb-ring { fill: none; stroke: #e7b94c; stroke-width: 5; transform-box: fill-box; transform-origin: center; animation: tb-ring .45s ease-out forwards; }
+@keyframes tb-ring { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+.part-snap { transform-box: fill-box; transform-origin: center; animation: tb-snap .32s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes tb-snap { from { transform: scale(1.18); } to { transform: scale(1); } }
+.tb-badge { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 2px solid #6f9c84; background: #fffdf3;
+  color: #3d6b57; font: inherit; font-size: 14px; line-height: 1; padding: 0; pointer-events: none; }
+.tb-badge.hot { background: var(--gold); border-color: #c79a2e; }
+.tb-tray { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tb-tile { position: relative; border-radius: 12px; background: var(--field); transition: transform .12s; }
+.tb-tile.selected { outline: 3px solid #5b9f87; background: #def1df; transform: translateY(-4px); }
+.tb-tile.installed { opacity: .55; }
+.tb-tile.missing .tb-art { opacity: .3; filter: grayscale(1); }
+.tb-tile.missing .tb-name { color: var(--muted); }
+.tb-tile.lifted .tb-art { opacity: .25; }
+.tb-tile.nope { animation: tb-nope .36s; }
+@keyframes tb-nope { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.tb-part { width: 100%; min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 4px 30px;
+  border: 0; border-radius: 12px; background: transparent; color: var(--ink); font: inherit; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tb-part:disabled { cursor: default; }
+.tb-art { display: block; width: 56px; height: 56px; transition: transform .16s ease-out; pointer-events: none; }
+.tb-art .part-art { width: 100%; height: 100%; display: block; }
+.tb-name { font-size: 13px; font-weight: 700; pointer-events: none; }
+.tb-part small { font-size: 11px; color: var(--muted); min-height: 1em; pointer-events: none; }
+.tb-rotate { position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: #fff;
+  color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+.tb-rotate:disabled { visibility: hidden; }
+.tb-ghost { position: fixed; z-index: 30; transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .25)); }
+.tb-ghost .tb-art { width: 100%; height: 100%; transition: none; }
+.tb-ghost.back { transition: left .2s ease-in, top .2s ease-in, opacity .2s; opacity: .3; }
+.tb-actions .btn.ready { box-shadow: 0 0 0 3px rgba(243, 216, 143, .9); }
+.tb-done { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 8px 0; }
+.tb-done-art { width: min(520px, 100%); animation: tb-idle .18s linear 6 alternate; }
+.tb-done-art .scooter-drawing { width: 100%; display: block; }
+@keyframes tb-idle { from { transform: translate(-1px, 0); } to { transform: translate(1px, -1px); } }
+.tb-done .btn { min-height: 44px; min-width: 160px; }
+@media (prefers-reduced-motion: reduce) {
+  .tb-ring, .part-snap, .tb-tile.nope, .tb-done-art, .tb-stage.choosing .tb-slot > * { animation: none; }
+  .tb-ghost.back { transition: none; }
+}
+@media (max-width: 640px), (max-height: 480px) {
+  .tbench { padding: 10px; gap: 6px; }
+  .tb-tray { gap: 4px; }
+  .tb-part { min-height: 96px; padding: 6px 2px 28px; }
+  .tb-art { width: 46px; height: 46px; }
+  .tb-name { font-size: 11px; }
+  .tb-rotate { width: 40px; height: 40px; right: 50%; margin-right: -20px; bottom: -6px; border: 2px solid var(--line); }
+}
+@media (max-height: 480px) and (min-width: 560px) {
+  /* 横向き：左にスクーター、右に部品（2列）。下の段に説明と操作ボタンを並べ、1画面に収める */
+  .tbench { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "head head" "stage tray" "note acts"; width: 100%; column-gap: 12px; }
+  .tbench > .bench-head { grid-area: head; }
+  .tb-stage { grid-area: stage; height: 46vh; width: auto; max-width: 100%; justify-self: center; }
+  .tbench > .bench-note { grid-area: note; font-size: 12px; align-self: center; }
+  .tb-tray { grid-area: tray; grid-template-columns: 1fr 1fr; align-content: start; }
+  .tb-part { min-height: 76px; flex-direction: row; gap: 6px; padding: 4px 44px 4px 6px; justify-content: flex-start; }
+  .tb-part small { display: none; }
+  .tb-rotate { right: 4px; margin-right: 0; bottom: 50%; margin-bottom: -20px; }
+  .tbench > .tb-actions { grid-area: acts; }
+}
