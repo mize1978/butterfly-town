@@ -1,0 +1,2 @@
+# Rails 標準の書き方（rubocop-rails-omakase）に合わせる。独自の規則は、必要になったときにここへ足す
+inherit_gem: { rubocop-rails-omakase: rubocop.yml }

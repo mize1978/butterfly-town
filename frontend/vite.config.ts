@@ -13,5 +13,9 @@ export default defineConfig({
     strictPort: true,
     proxy: { "/api": process.env.API_ORIGIN ?? "http://127.0.0.1:3100" }
   },
-  test: { include: ["src/**/*.test.ts"], environment: "node" }
+  test: {
+    include: ["src/**/*.test.ts"], environment: "node",
+    // カバレッジ（npm run coverage）。描画（Phaser）と画面（React）は単体テストの対象外なので、判断の部分（core・game・api）だけを数える
+    coverage: { provider: "v8", include: ["src/core/**", "src/game/**", "src/api/**"], exclude: ["**/*.test.ts"], reporter: ["text-summary", "html"] }
+  }
 });
