@@ -10,6 +10,9 @@ import { hitsResident, hitsTag, SAMPLE_RESIDENT, TALK_RANGE, type Rect, type Sam
 // 描いている名札の範囲（論理座標）。タップで選ぶ当たり判定に足す
 export type Tags = Partial<Record<SpotId, Rect>>;
 
+// 会話やメニューを閉じた直後に、入力を受け付けない時間（秒）。閉じるボタンの連打・ダブルタップの2回目が街に届いても歩き出さない
+export const RESUME_GUARD = 0.35;
+
 export class Session {
   readonly sim: Sim;
   view: View; // いま映している範囲（描画とポインターの座標変換が毎フレーム読む）
@@ -18,6 +21,7 @@ export class Session {
   private near: SpotId | null = null; // 話せる（調べられる）距離にいる場所。複数なら一番近いところ
   private selected: SpotId | null = null; // タップして選んでいる場所（スマホで「話す」「調べる」を出す条件）
   private repairState: Repair = START; // スクーター修理の依頼と修理の進み具合（保存しない）
+  private sinceResume = Infinity; // 閉じてからの時間（秒）
   private walked = false; // 一度でも歩いたか（スマホの移動の説明を消す条件）
   private listeners = new Set<() => void>();
 
@@ -37,20 +41,22 @@ export class Session {
   // メニューや会話を開いている間は止める。人物はその場で止まり（位置はそのまま）、押しても歩かない。
   // 閉じたら同じ位置・同じカメラから続ける（作り直さない）
   pause() { this.paused = true; this.sim.halt(); }
-  resume() { this.paused = false; }
+  resume() { if (this.paused) this.sinceResume = 0; this.paused = false; }
+  // いま歩く・選ぶ入力を受け付けるか（止めている間と、閉じた直後は受け付けない）
+  private get accepting() { return !this.paused && this.sinceResume >= RESUME_GUARD; }
   get isPaused() { return this.paused; } // 会話や説明を開いている間（描く側が頭上の表示を隠すのに使う）
 
   // 押している地点を伝える。止めている間は受け付けない
   // 地面を押したら住民の選択は外す
   press(p: Point) {
-    if (this.paused) return;
+    if (!this.accepting) return;
     this.sim.press(p);
     this.setSelected(null);
   }
   release() { this.sim.release(); }
-  // 目的地を決めて歩く（タップした場所まで歩いて止まる。体験見本の操作）。止めている間は受け付けない
+  // 目的地を決めて歩く（タップした場所まで歩いて止まる）。止めている間は受け付けない
   goTo(p: Point) {
-    if (this.paused) return;
+    if (!this.accepting) return;
     this.sim.goTo(p);
     this.setSelected(null);
   }
@@ -58,11 +64,12 @@ export class Session {
   // 近くでタップした場所の会話・発見の画面を開く窓口（画面側が設定する）
   onOpen: ((id: SpotId) => void) | null = null;
 
-  // 住民・スクーター修理・部品へのタップ（スマホ）。体（絵）か名札（tags：描いている名札の範囲）に当たったら、歩き出さずに true を返す。
+  // 住民・スクーター修理・部品へのタップ（PC のクリックも同じ）。体（絵）か名札（tags：描いている名札の範囲）に当たったら、歩き出さずに true を返す。
   // 話せる（調べられる）距離にいれば、その場で会話・発見の画面を開く（onOpen）。遠ければ選ぶだけ（「近づくと話せます」の案内に使う）。
   // 外れたら何もしない（false：地面への移動になる）。部品は置かれている間だけ当たる
   tapSpot(p: Point, tags: Tags = {}): boolean {
     if (this.paused) return false;
+    if (!this.accepting) return true; // 閉じた直後のタップは、住民などを開き直さず、地面への移動にもしない（受け流す）
     const hit = this.spots().find((s) => (s.id === "resident" ? hitsResident(this.resident, p, tags.resident) : hitsSpot(s, p, tags[s.id])));
     if (!hit) return false;
     if (hit.id === this.near) { this.setSelected(null); this.onOpen?.(hit.id); }
@@ -120,6 +127,7 @@ export class Session {
   tick(dt: number) {
     // 止めている間も時間は進める（入力が無いので動かず、待機姿勢へ移る）
     this.sim.step(dt);
+    if (!this.paused) this.sinceResume += dt;
     this.view = follow(this.town, this.view, this.sim.pos, dt, this.size);
     if (!this.walked && this.sim.moving) { this.walked = true; this.notify(); }
     this.updateNear();

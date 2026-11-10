@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TOWN } from "../test/town";
 import { allowed } from "../core/world";
 import { SAMPLE_RESIDENT, TALK_RANGE } from "./sample-resident";
-import { Session } from "./session";
+import { RESUME_GUARD, Session } from "./session";
 
 const run = (s: Session, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.tick(dt); };
 const east = { x: TOWN.spawn.x + 300, y: TOWN.spawn.y };
@@ -43,6 +43,7 @@ describe("メニューを開いている間の街", () => {
     expect(s.view.x).toBeCloseTo(view.x, 3);
     expect(s.view.y).toBeCloseTo(view.y, 3);
     expect(s.sim.pos).not.toEqual(TOWN.spawn);
+    run(s, RESUME_GUARD); // 閉じた直後の連打は受け流すので、少し待ってから押す
     s.press(east);
     run(s, 0.3);
     expect(s.sim.pos.x).toBeGreaterThan(pos.x);
@@ -149,5 +150,37 @@ describe("スマホで住民をタップしたとき", () => {
     s.press(east);
     run(s, 0.3);
     expect(s.hasWalked).toBe(true);
+  });
+});
+
+describe("会話やメニューを閉じた直後の入力（閉じるボタンの連打・ダブルタップ）", () => {
+  const closeThenTap = (act: (s: Session) => void) => {
+    const s = new Session(TOWN);
+    s.pause();
+    run(s, 1);
+    s.resume();
+    const at = { ...s.sim.pos };
+    act(s); // 閉じた直後（同じ指の2回目のタップ）
+    run(s, 1);
+    return { s, at };
+  };
+  it("閉じた直後の地面へのタップでは歩き出さない", () => {
+    const { s, at } = closeThenTap((s) => s.goTo(east));
+    expect(s.sim.pos).toEqual(at);
+  });
+  it("閉じた直後に押し始めても歩き出さない", () => {
+    const { s, at } = closeThenTap((s) => { s.press(east); });
+    s.release();
+    expect(s.sim.pos).toEqual(at);
+  });
+  it("少し待てば、また歩ける", () => {
+    const s = new Session(TOWN);
+    s.pause();
+    s.resume();
+    run(s, 0.5);
+    const x = s.sim.pos.x;
+    s.goTo(east);
+    run(s, 0.5);
+    expect(s.sim.pos.x).toBeGreaterThan(x);
   });
 });

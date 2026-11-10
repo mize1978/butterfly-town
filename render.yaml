@@ -1,0 +1,25 @@
+# 初回デプロイの候補：Render（Docker の Web サービス＋PostgreSQL）。デプロイ先は README で「AWS と PaaS を比較中」のため未決定。
+# この設定で作るときは、Render のダッシュボードで「Blueprint」からこのリポジトリを選ぶ（作成・課金の確認はみぜが行う）。
+services:
+  - type: web
+    name: butterfly-town
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: 0.5c-512mb # 0.5 CPU・512 MB（月 $7。2026-11-11 に render.com/pricing で確認）
+    healthCheckPath: /up
+    autoDeployTrigger: "off" # main へのマージで自動では出さない。CI が通ったのを見てから手動で出す
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: butterfly-town-db
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_MAX_THREADS
+        value: "5"
+      # AI の API キーは、実LLMの Issue で追加する（画面には渡さない。Rails の環境変数だけに置く）
+
+databases:
+  - name: butterfly-town-db
+    plan: 0.1c-256mb # 0.1 CPU・256 MB（月 $6＋保存容量 1GB あたり $0.30。無料の DB は使わない：期限で消えるとの情報があり、公式の料金ページには記載がない）
+    postgresMajorVersion: "17"

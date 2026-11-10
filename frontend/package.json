@@ -8,6 +8,7 @@
   },
   "scripts": {
     "art": "node scripts/copy-art.mjs",
+    "art:placeholder": "node scripts/make-placeholder-art.mjs public/art",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
