@@ -10,10 +10,25 @@ import { ConversationView } from "./ConversationView";
 import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
+import { PHONE_QUERY } from "../game/view-size";
 
 type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; town: Town };
 type Overlay = null | "menu" | "talk";
 const noop = () => () => {};
+
+// スマホ表示か（街の映し方・CSS と同じ条件）。画面の回転などで切り替わったら描き直す
+function usePhone(): boolean {
+  return useSyncExternalStore(
+    (fn) => { const m = window.matchMedia(PHONE_QUERY); m.addEventListener("change", fn); return () => m.removeEventListener("change", fn); },
+    () => window.matchMedia(PHONE_QUERY).matches
+  );
+}
+
+// スマホの「行きたい方向を長押しすると歩きます」は初回だけ出す。一度歩いたらこのブラウザでは次から出さない
+// （遊びの進行ではなく画面の案内の記録。保存できない環境では毎回出るだけで、止まらない）
+const WALK_HINT_KEY = "butterfly-town.walk-hint-seen";
+function walkHintSeen(): boolean { try { return localStorage.getItem(WALK_HINT_KEY) === "1"; } catch { return false; } }
+function saveWalkHintSeen() { try { localStorage.setItem(WALK_HINT_KEY, "1"); } catch { /* 保存できなくても続ける */ } }
 
 export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
@@ -34,6 +49,11 @@ export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
   const town = load.status === "ready" ? load.town : null;
   const session = useMemo(() => (town ? new Session(town) : null), [town]);
   const near = useSyncExternalStore(session?.subscribe ?? noop, () => session?.nearResident ?? false);
+  const selected = useSyncExternalStore(session?.subscribe ?? noop, () => session?.residentSelected ?? false);
+  const walked = useSyncExternalStore(session?.subscribe ?? noop, () => session?.hasWalked ?? false);
+  const phone = usePhone();
+  const [hintSeen] = useState(walkHintSeen);
+  useEffect(() => { if (walked) saveWalkHintSeen(); }, [walked]);
 
   useEffect(() => {
     if (!session) return;
@@ -86,16 +106,30 @@ export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
               <div className="world-wrap">
                 <GameView session={session} />
               </div>
-              <div className="town-actions">
-                <button type="button" ref={talkButton} className="btn primary" disabled={!near} aria-describedby="talk-hint"
-                  onClick={() => setOverlay((o) => o ?? "talk")}>
-                  話す →
-                </button>
-                <p className="hint" id="talk-hint">
-                  {near ? `${session.resident.name}と話せます。` : `${session.resident.name}に近づくと話せます。`}
-                  行きたい方向を長押しすると歩きます。
-                </p>
-              </div>
+              {phone ? (
+                // スマホ：「話す」は住民をタップして選んだときだけ出す（話せる距離は PC と同じ）。移動の説明は初回だけ
+                <div className="town-actions">
+                  <p className="hint" id="talk-hint" aria-live="polite">
+                    {selected && !near ? `${session.resident.name}に近づくと話せます。` : !walked && !hintSeen ? "行きたい方向を長押しすると歩きます。" : ""}
+                  </p>
+                  {selected && near && (
+                    <button type="button" ref={talkButton} className="btn primary" onClick={() => setOverlay((o) => o ?? "talk")}>
+                      話す →
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="town-actions">
+                  <button type="button" ref={talkButton} className="btn primary" disabled={!near} aria-describedby="talk-hint"
+                    onClick={() => setOverlay((o) => o ?? "talk")}>
+                    話す →
+                  </button>
+                  <p className="hint" id="talk-hint">
+                    {near ? `${session.resident.name}と話せます。` : `${session.resident.name}に近づくと話せます。`}
+                    行きたい方向を長押しすると歩きます。
+                  </p>
+                </div>
+              )}
             </div>
             {overlay === "menu" && <TownMenu onClose={() => close(menuButton)} onExitToTitle={onExitToTitle} />}
             {overlay === "talk" && <ConversationView resident={session.resident} onClose={() => close(talkButton)} />}

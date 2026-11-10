@@ -60,12 +60,13 @@ describe("仮の住民に話しかけられる距離", () => {
 
   it("住民の方へ歩くと近くにいる状態になり、知らせは変わったときに1回だけ届く", () => {
     const s = new Session(TOWN);
-    let calls = 0;
-    s.subscribe(() => calls++);
+    // 知らせは「歩いた」の合図でも届くので、近さが変わった回数だけを数える
+    let changes = 0, last = s.nearResident;
+    s.subscribe(() => { if (s.nearResident !== last) { changes++; last = s.nearResident; } });
     s.press(r);
     run(s, 3);
     expect(s.nearResident).toBe(true);
-    expect(calls).toBe(1);
+    expect(changes).toBe(1);
   });
 
   it("会話中（止めている間）は住民の近くから動かず、閉じると同じ位置から続く", () => {
@@ -81,5 +82,72 @@ describe("仮の住民に話しかけられる距離", () => {
     s.resume();
     expect(s.sim.pos).toEqual(at);
     expect(s.nearResident).toBe(true);
+  });
+});
+
+describe("スマホで住民をタップしたとき", () => {
+  const onResident = { x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 80 };
+
+  it("住民に当たったら選ぶだけで、主人公は歩き出さない", () => {
+    const s = new Session(TOWN);
+    expect(s.tapResident(onResident)).toBe(true);
+    run(s, 1);
+    expect(s.residentSelected).toBe(true);
+    expect(s.sim.pos).toEqual(TOWN.spawn);
+    expect(s.sim.target).toBeNull();
+  });
+
+  // 名札の範囲（描画側が渡す）。スマホの名札は体より少し広い。名前が長いなどでさらに広い場合も確かめる。
+  // どちらも左右の端は体の当たり範囲（±40）の外にある
+  const R = SAMPLE_RESIDENT.pos;
+  const tag = (halfW: number, h: number) => ({ x: R.x - halfW, y: R.y - 207 - h, w: halfW * 2, h });
+  for (const [label, t] of [["スマホの名札", tag(53, 27)], ["さらに広い名札", tag(76, 38)]] as const) {
+    it(`${label}：名札の中央・左端・右端のどこを押しても選べ、歩き出さない`, () => {
+      const midY = t.y + t.h / 2;
+      for (const x of [R.x, t.x + 1, t.x + t.w - 1]) {
+        const s = new Session(TOWN);
+        expect(s.tapResident({ x, y: midY }, t)).toBe(true);
+        run(s, 0.5);
+        expect(s.sim.pos).toEqual(TOWN.spawn);
+        expect(s.sim.target).toBeNull();
+      }
+    });
+
+    it(`${label}：名札から少し外れた所は選ばない（地面への移動になる）`, () => {
+      const s = new Session(TOWN);
+      expect(s.tapResident({ x: t.x + t.w + 20, y: t.y + t.h / 2 }, t)).toBe(false);
+      expect(s.tapResident({ x: R.x, y: t.y - 20 }, t)).toBe(false);
+    });
+  }
+
+  it("住民から外れたタップは選ばない（そのあと地面を押せば歩く）", () => {
+    const s = new Session(TOWN);
+    expect(s.tapResident(east)).toBe(false);
+    expect(s.residentSelected).toBe(false);
+  });
+
+  it("地面を押すと選択が外れ、話せる距離を離れても外れる", () => {
+    const s = new Session(TOWN);
+    s.tapResident(onResident);
+    s.press(east);
+    expect(s.residentSelected).toBe(false);
+  });
+
+  it("止めている間（メニュー・会話中）は選ばない", () => {
+    const s = new Session(TOWN);
+    s.pause();
+    expect(s.tapResident(onResident)).toBe(false);
+  });
+
+  it("話せる距離は今までどおり 120", () => {
+    expect(TALK_RANGE).toBe(120);
+  });
+
+  it("一度歩くと「歩いた」になる（移動の説明を消す合図）", () => {
+    const s = new Session(TOWN);
+    expect(s.hasWalked).toBe(false);
+    s.press(east);
+    run(s, 0.3);
+    expect(s.hasWalked).toBe(true);
   });
 });
