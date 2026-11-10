@@ -14,6 +14,8 @@ class TownScene extends Phaser.Scene {
   private failed = false;
   private sprites = new Map<string, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse }>();
   private ring!: Phaser.GameObjects.Graphics;
+  private resident!: Phaser.GameObjects.Container;
+  private residentLabel!: Phaser.GameObjects.Text;
   created = false;
 
   constructor() { super("town"); }
@@ -50,6 +52,8 @@ class TownScene extends Phaser.Scene {
         img: this.add.image(0, 0, SPRITE_FILES[0]).setDepth(2).setVisible(false)
       });
     }
+    this.resident = makeResident(this, this.session);
+    this.residentLabel = this.resident.getByName("label") as Phaser.GameObjects.Text;
     this.textures.addCanvas("foreground", makeForeground(this.textures.get(town.background).getSourceImage() as HTMLImageElement, this.session));
     this.add.image(0, 0, "foreground").setOrigin(0, 0).setDepth(3);
     this.ring = this.add.graphics().setDepth(4);
@@ -72,9 +76,27 @@ class TownScene extends Phaser.Scene {
       o.img.setOrigin(p.originX, p.originY).setScale(p.flip ? -k : k, k).setPosition(p.x, p.y).setAlpha(a.alpha).setDepth(2 + i / 10).setVisible(true);
       if (a.shadow) o.shadow.setPosition(a.shadow.x, a.shadow.y - 3).setSize(a.shadow.rx * 2, a.shadow.ry * 2).setVisible(true);
     });
+    // 仮の住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
+    this.resident.setDepth(s.resident.pos.y < sim.pos.y ? 1.5 : 2.9);
+    this.residentLabel.setBackgroundColor(s.nearResident ? "#f3d88f" : "#fbf7ec");
     this.ring.clear();
     if (sim.target) this.ring.lineStyle(3, sim.blocked ? 0xeab86b : 0xfff9d2, 1).strokeCircle(sim.target.x, sim.target.y, 13);
   }
+}
+
+// 仮の住民。立ち絵・歩行素材はまだ無いので、人物と見分けられる単純な形と「（仮）」付きの名札で示す
+function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Container {
+  const { pos, name } = s.resident, H = 150;
+  const g = scene.add.graphics();
+  g.fillStyle(0x243e35, 0.27).fillEllipse(0, -3, 40, 14); // 影
+  g.fillStyle(0x254b43, 0.85).fillRoundedRect(-20, -H + 34, 40, H - 34, 16); // 体
+  g.fillCircle(0, -H + 18, 18); // 頭
+  g.lineStyle(3, 0xfff9e9, 0.9).strokeRoundedRect(-20, -H + 34, 40, H - 34, 16).strokeCircle(0, -H + 18, 18);
+  const label = scene.add.text(0, -H - 14, name, {
+    fontFamily: '"Noto Sans JP", "Hiragino Sans", sans-serif', fontSize: "22px", color: "#254b43", backgroundColor: "#fbf7ec",
+    padding: { x: 10, y: 4 }
+  }).setOrigin(0.5, 1).setName("label");
+  return scene.add.container(pos.x, pos.y, [g, label]).setDepth(1.5);
 }
 
 // 背景から手前の植栽だけを切り抜いた透過画像。人物の上に重ねて「植栽の奥にいる」ように見せる
@@ -102,11 +124,11 @@ function bindPointer(el: HTMLCanvasElement, s: Session): () => void {
     e.preventDefault();
     id = e.pointerId;
     try { el.setPointerCapture(e.pointerId); } catch { /* 合成イベントではキャプチャできない場合がある */ }
-    s.sim.press(toWorld(e));
+    s.press(toWorld(e));
   };
-  const move = (e: PointerEvent) => { if (id === e.pointerId) s.sim.press(toWorld(e)); };
-  const up = (e: PointerEvent) => { if (id === e.pointerId) { id = null; s.sim.release(); } };
-  const cancelAll = () => { id = null; s.sim.release(); };
+  const move = (e: PointerEvent) => { if (id === e.pointerId) s.press(toWorld(e)); };
+  const up = (e: PointerEvent) => { if (id === e.pointerId) { id = null; s.release(); } };
+  const cancelAll = () => { id = null; s.release(); };
   const onVis = () => { if (document.hidden) cancelAll(); };
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
@@ -134,7 +156,8 @@ export class PhaserTown {
       const scene = new TownScene();
       const game = new Phaser.Game({
         type: Phaser.AUTO, parent, width: session.view.w, height: session.view.h, backgroundColor: "#ece8dc",
-        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        // 中央寄せは外側の CSS（.world-host の flex）で行う。Phaser の autoCenter も使うと余白が二重につき、左にずれる
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.NO_CENTER },
         banner: false, audio: { noAudio: true }, scene: []
       });
       this.game = game;
