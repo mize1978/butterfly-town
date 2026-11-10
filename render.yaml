@@ -1,30 +1,26 @@
-# 初回デプロイ：Render の無料枠（Docker の Web サービス＋PostgreSQL）。Apply の画面で月額 $0 と表示される構成。
-# 無料枠の制限（2026-11-11 に render.com/docs/free で確認）：
-# - Web：15分アクセスがないと止まり、次のアクセスで起動に約1分かかる。ワークスペース全体で月750時間まで
-# - PostgreSQL：作成から30日で期限切れ（その後14日以内に有料へ上げないとデータごと削除）。容量1GB・バックアップなし・ワークスペースに1つまで
-#   → 11月中旬に作ると、期限が12/11の公開日ごろに来る。公開前に有料（0.1c-256mb・月$6）へ上げるか作り直すかを決める
-# - Web からのメール送信（25・465・587番ポート）はできない。パスワード再設定のメールは HTTP API の配信サービスを使う
+# 初回デプロイ：Render の無料の Web サービス（Docker・Oregon）だけを作る。Apply の画面で月額 $0 と表示される構成。
+# データベースはこの Blueprint では作らない。既存の PostgreSQL インスタンス（rewardme-db）の中に、
+# Butterfly Town 専用のデータベースと接続ユーザーを作り、その接続先を DATABASE_URL として Render の画面で手入力する。
+# 無料の Web の制限（2026-11-11 に render.com/docs/free で確認）：
+# - 15分アクセスがないと止まり、次のアクセスで起動に約1分かかる。ワークスペース全体で月750時間まで
+# - メール送信（25・465・587番ポート）はできない。パスワード再設定のメールは HTTP API の配信サービスを使う
 # この設定で作るときは、Render のダッシュボードで「Blueprint」からこのリポジトリを選ぶ（作成・課金の確認はみぜが行う）。
 services:
   - type: web
     name: butterfly-town
     runtime: docker
     dockerfilePath: ./Dockerfile
+    region: oregon # rewardme-db と同じリージョンにすると、内部 URL でつなげる
     plan: free # 有料にするときは 0.5c-512mb（0.5 CPU・512 MB・月 $7）
     healthCheckPath: /up
     autoDeployTrigger: "off" # main へのマージで自動では出さない。CI が通ったのを見てから手動で出す
     envVars:
+      # 専用データベースの接続先。Apply のときに Render の画面で入力する（リポジトリには書かない）
+      # 例：postgresql://butterfly_town:<パスワード>@<rewardme-db の内部ホスト>/butterfly_town_production
       - key: DATABASE_URL
-        fromDatabase:
-          name: butterfly-town-db
-          property: connectionString
+        sync: false
       - key: SECRET_KEY_BASE
         generateValue: true
       - key: RAILS_MAX_THREADS
         value: "5"
       # AI の API キーは、実LLMの Issue で追加する（画面には渡さない。Rails の環境変数だけに置く）
-
-databases:
-  - name: butterfly-town-db
-    plan: free # 有料にするときは 0.1c-256mb（0.1 CPU・256 MB・月 $6＋保存容量 1GB あたり $0.30）
-    postgresMajorVersion: "17"
