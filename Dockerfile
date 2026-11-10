@@ -4,6 +4,7 @@
 # 3. ビルドした画面を Rails の public/ に置き、同じオリジンで /api と画面を配る（CORS を使わない）
 # 開発・テスト用は backend/Dockerfile.dev（Docker Compose）。
 # 素材（frontend/public/art）は権利条件が未確認のため、.dockerignore でイメージに入れない（README・copy-art.mjs を参照）。
+# 代わりに、図形だけで描く仮素材（scripts/make-placeholder-art.mjs。外部の素材を使わない）をビルドのときに作って入れる。
 
 FROM node:26.5.0-bookworm-slim AS frontend
 WORKDIR /app/frontend
@@ -12,7 +13,7 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 # 見本ページなど一部の画面は、街の地図（backend/config/towns）を直接読み込む
 COPY backend/config/towns/ /app/backend/config/towns/
-RUN npm run build
+RUN npm run art:placeholder && npm run build
 
 FROM ruby:3.4.10-slim AS gems
 RUN apt-get update -qq \
