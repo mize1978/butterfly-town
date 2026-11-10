@@ -1,11 +1,16 @@
-# 初回デプロイの候補：Render（Docker の Web サービス＋PostgreSQL）。デプロイ先は README で「AWS と PaaS を比較中」のため未決定。
+# 初回デプロイ：Render の無料枠（Docker の Web サービス＋PostgreSQL）。Apply の画面で月額 $0 と表示される構成。
+# 無料枠の制限（2026-11-11 に render.com/docs/free で確認）：
+# - Web：15分アクセスがないと止まり、次のアクセスで起動に約1分かかる。ワークスペース全体で月750時間まで
+# - PostgreSQL：作成から30日で期限切れ（その後14日以内に有料へ上げないとデータごと削除）。容量1GB・バックアップなし・ワークスペースに1つまで
+#   → 11月中旬に作ると、期限が12/11の公開日ごろに来る。公開前に有料（0.1c-256mb・月$6）へ上げるか作り直すかを決める
+# - Web からのメール送信（25・465・587番ポート）はできない。パスワード再設定のメールは HTTP API の配信サービスを使う
 # この設定で作るときは、Render のダッシュボードで「Blueprint」からこのリポジトリを選ぶ（作成・課金の確認はみぜが行う）。
 services:
   - type: web
     name: butterfly-town
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: 0.5c-512mb # 0.5 CPU・512 MB（月 $7。2026-11-11 に render.com/pricing で確認）
+    plan: free # 有料にするときは 0.5c-512mb（0.5 CPU・512 MB・月 $7）
     healthCheckPath: /up
     autoDeployTrigger: "off" # main へのマージで自動では出さない。CI が通ったのを見てから手動で出す
     envVars:
@@ -21,5 +26,5 @@ services:
 
 databases:
   - name: butterfly-town-db
-    plan: 0.1c-256mb # 0.1 CPU・256 MB（月 $6＋保存容量 1GB あたり $0.30。無料の DB は使わない：期限で消えるとの情報があり、公式の料金ページには記載がない）
+    plan: free # 有料にするときは 0.1c-256mb（0.1 CPU・256 MB・月 $6＋保存容量 1GB あたり $0.30）
     postgresMajorVersion: "17"
