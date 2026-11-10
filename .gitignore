@@ -7,3 +7,5 @@
 !/backend/storage/.keep
 /backend/.bundle/
 /frontend/node_modules/
+/backend/coverage/
+/frontend/coverage/

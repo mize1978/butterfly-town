@@ -3,13 +3,16 @@
   "private": true,
   "description": "Butterfly Town のフロントエンド（React + Phaser 4）。街の地図は Rails API から受け取る",
   "type": "module",
-  "engines": { "node": "26.5.0" },
+  "engines": {
+    "node": "26.5.0"
+  },
   "scripts": {
     "art": "node scripts/copy-art.mjs",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "phaser": "4.2.1",
@@ -20,6 +23,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "@vitest/coverage-v8": "5.0.3",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.3"

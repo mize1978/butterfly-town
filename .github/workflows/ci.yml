@@ -1,0 +1,84 @@
+# PR と main への push で、Rails と画面（React + Phaser）の確認を走らせる。
+# どれかが失敗したら、マージしない（ブランチ保護で必須にする）
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Rails（テスト・RuboCop・Brakeman）
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      db:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      RAILS_ENV: test
+      DB_HOST: localhost
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: backend
+          bundler-cache: true
+      - name: RuboCop（書き方）
+        run: bundle exec rubocop
+      - name: Brakeman（脆弱性の静的検査）
+        run: bundle exec brakeman -q --no-pager --exit-on-warn
+      - name: テスト
+        run: bin/rails db:prepare && bin/rails test
+      - name: カバレッジを残す
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          if-no-files-found: ignore
+
+  frontend:
+    name: 画面（型チェック・テスト・ビルド）
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/package.json # engines.node（26.5.0）
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: 型チェック
+        run: npm run typecheck
+      - name: テスト（カバレッジつき）
+        run: npm run coverage
+      - name: ビルド
+        run: npm run build
+      - name: カバレッジを残す
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: ignore
