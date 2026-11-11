@@ -5,7 +5,9 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resource :town, only: :show
-      resource :playthrough, only: %i[show create]
+      resource :playthrough, only: %i[show create] do
+        resources :time_slots, only: :create
+      end
     end
   end
 end

@@ -14,16 +14,23 @@ class Playthrough < ApplicationRecord
 
   scope :in_progress, -> { where(status: "in_progress") }
 
-  # ゲストの進行中の街を返す。無ければ初期状態で作る。作ったときは2つ目の値が true
   def self.current_for(guest) = guest.playthroughs.in_progress.find_by(mission_key: MISSION)
 
+  # ゲストの進行中の街を返す。無ければ初期状態（住民3人・最初の場所・最初の記憶）で作る。作ったときは2つ目の値が true
   def self.start_for!(guest)
     current = current_for(guest)
     return [ current, false ] if current
 
     created = transaction do
       create!(guest: guest, mission_key: MISSION).tap do |pt|
-        ResidentCatalog.all.each { pt.residents.create!(key: _1.fetch("key"), location_key: _1.fetch("location")) }
+        ResidentCatalog.all.each do |definition|
+          key = definition.fetch("key")
+          resident = pt.residents.create!(key: key, location_key: ResidentCatalog.initial_location(key))
+          definition.fetch("memories", []).each do |m|
+            resident.memories.create!(fact_key: m.fetch("fact_key"), content: ResidentCatalog.fact(m.fetch("fact_key")),
+                                      interpretation: m["interpretation"], source: "initial")
+          end
+        end
       end
     end
     [ created, true ]
