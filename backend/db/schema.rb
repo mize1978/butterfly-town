@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_11_000008) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -72,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_000008) do
     t.datetime "finished_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["guest_id", "mission_key"], name: "index_playthroughs_one_in_progress_per_guest", unique: true, where: "((status)::text = 'in_progress'::text)"
     t.index ["guest_id"], name: "index_playthroughs_on_guest_id"
     t.index ["user_id", "mission_key"], name: "index_playthroughs_one_in_progress_per_user", unique: true, where: "((status)::text = 'in_progress'::text)"
     t.index ["user_id"], name: "index_playthroughs_on_user_id"
