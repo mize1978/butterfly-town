@@ -12,19 +12,19 @@ export function HowToBody() {
         <dt>いまできること</dt>
         <dd>行きたい場所をタップ（クリック）すると、そこまで歩きます。長押しすると押している方へ歩き続け、離すと止まります。右上の「メニュー」で一時停止できます。</dd>
       </dl>
-      <p className="note">この試作版では、街の探索・サンプル会話・スクーター修理の部品探しと作業台での修理を体験できます。進行は保存されません。</p>
+      <p className="note">この試作版では、街の探索・サンプル会話・スクーター修理の部品探しと作業台での修理を体験できます。時間帯などの街の進行は、同じブラウザなら再読み込みしても続きから戻ります（いまは時間帯を進める操作はまだありません）。歩いた位置と修理の進み具合は保存されません。</p>
     </>
   );
 }
 
-export function HowToScreen({ onStart, onBack }: { onStart: () => void; onBack: () => void }) {
+export function HowToScreen({ onStart, onBack, starting = false }: { onStart: () => void; onBack: () => void; starting?: boolean }) {
   return (
     <Frame label="遊び方">
       <main className="page">
         <h1 className="lead">小さな一手で、街に変化を</h1>
         <HowToBody />
         <div className="actions">
-          <button type="button" className="btn primary" onClick={onStart} autoFocus>ゲストで始める →</button>
+          <button type="button" className="btn primary" onClick={onStart} disabled={starting} autoFocus>{starting ? "街を準備しています…" : "ゲストで始める →"}</button>
           <button type="button" className="btn" onClick={onBack}>トップへ戻る</button>
         </div>
       </main>

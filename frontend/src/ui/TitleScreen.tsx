@@ -5,7 +5,11 @@ import { useCallback, useState } from "react";
 import { initialWaterOn, saveWaterOn, TitleWater } from "../title/TitleWater";
 import { Locked } from "./Frame";
 
-export function TitleScreen({ onGuest, onHowTo }: { onGuest: () => void; onHowTo: () => void }) {
+export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null }: {
+  onGuest: () => void; onHowTo: () => void;
+  starting?: boolean; // 街を始める通信の途中（二度押しさせない）
+  notice?: string | null; // 通信の失敗などの案内
+}) {
   const [water, setWater] = useState(initialWaterOn);
   const [unavailable, setUnavailable] = useState(false); // 描画できない環境では静止画で表示していることを示す
   const toggle = () => setWater((on) => { saveWaterOn(!on); return !on; });
@@ -20,7 +24,8 @@ export function TitleScreen({ onGuest, onHowTo }: { onGuest: () => void; onHowTo
         <p className="title-brand">Butterfly Town</p>
         <h1 className="title-lead">小さな一手が、<wbr />街の未来を変える。</h1>
         <p className="title-sub">記憶と意思を持つ住民たちと、5日間の街祭りへ。</p>
-        <button type="button" className="btn primary start" onClick={onGuest} autoFocus>ゲストで遊ぶ →</button>
+        {notice && <p className="status error" role="alert">{notice}</p>}
+        <button type="button" className="btn primary start" onClick={onGuest} disabled={starting} autoFocus>{starting ? "街を準備しています…" : "ゲストで遊ぶ →"}</button>
         <button type="button" className="btn ghost" onClick={onHowTo}>遊び方</button>
         <Locked labels={["登録する", "ログイン", "つづきから"]} note="試作版：ゲストプレイのみ利用できます" />
       </main>
