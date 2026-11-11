@@ -69,6 +69,7 @@ MVP（README「7-2. MVPの完成範囲」）で使うテーブルの設計です
 | `users.email` | 小文字に正規化して一意 |
 | `guests.token_digest` | 一意 |
 | `playthroughs(user_id, mission_key)` | `status = 'in_progress'` の行だけを対象にした部分一意インデックス。同じミッションの進行中の街は1ユーザーに1つ |
+| `playthroughs(guest_id, mission_key)` | 同じく `status = 'in_progress'` の行だけを対象にした部分一意インデックス。ゲストも同じミッションの進行中の街は1つ（#7 で追加。開始が同時に届いても街を2つ作らない） |
 | `playthrough_claims.playthrough_id` | 一意。1つの街は1回だけ引き継げる |
 | `playthrough_claims.request_id` | 一意。同じ引継ぎの再送を見分ける |
 | `time_slot_runs(playthrough_id, time_index)` | 一意。やり直しても行を増やさない |

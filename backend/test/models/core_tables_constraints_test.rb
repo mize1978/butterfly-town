@@ -1,4 +1,5 @@
 require "test_helper"
+require "minitest/mock"
 
 # ER図（docs/er-diagram.md）の「図だけでは伝わらない決まり」を、DB の制約が守ることを確かめる。
 # モデルの検証を通さずに DB へ直接書き込み、DB 自身が拒否するかを見る
@@ -54,6 +55,29 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
       Playthrough.insert!({ mission_key: "festival", user_id: 1, status: "in_progress" })
     end
     2.times { Playthrough.insert!({ mission_key: "festival", user_id: 1, status: "shelved" }) }
+  end
+
+  test "同じゲストの進行中の街も1つだけ（#7：開始が同時に届いても2つ作らない）" do
+    g = guest
+    Playthrough.create!(guest: g, mission_key: "festival")
+    assert_rejected(ActiveRecord::RecordNotUnique) do
+      Playthrough.insert!({ mission_key: "festival", guest_id: g.id, status: "in_progress" })
+    end
+    Playthrough.insert!({ mission_key: "festival", guest_id: g.id, status: "finished", result: "success" })
+  end
+
+  test "開始が同時に届いて一意制約にぶつかったら、先にできた街を返す" do
+    g = guest
+    other = Playthrough.create!(guest: g, mission_key: "festival") # もう1つのリクエストが先に作り終えた街
+    original = Playthrough.method(:current_for)
+    calls = 0
+    # こちらが最初に探したときは、まだ見えていなかったことにする（2回目からは本物）
+    first_miss = ->(gu) { (calls += 1) == 1 ? nil : original.call(gu) }
+    Playthrough.stub(:current_for, first_miss) do
+      assert_equal [ other, false ], Playthrough.start_for!(g)
+    end
+    assert_equal 1, g.playthroughs.count
+    assert_equal 2, calls
   end
 
   # --- 時間帯の処理 ---

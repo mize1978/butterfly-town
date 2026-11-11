@@ -3,7 +3,9 @@
 class ResidentCatalog
   PATH = Rails.root.join("config/residents.yml")
 
-  def self.keys
-    @keys ||= YAML.safe_load_file(PATH).fetch("residents").map { _1.fetch("key") }.freeze
+  def self.all
+    @all ||= YAML.safe_load_file(PATH).fetch("residents").map(&:freeze).freeze
   end
+
+  def self.keys = all.map { _1.fetch("key") }
 end
