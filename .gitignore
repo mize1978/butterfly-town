@@ -7,3 +7,9 @@
 !/backend/storage/.keep
 /backend/.bundle/
 /frontend/node_modules/
+
+# 実LLM検証（Issue #5）専用の bundle
+/backend/script/llm/.bundle/
+/backend/script/llm/vendor/
+# 試行と費用の生ログは手元だけに残す（集計は docs/spike/llm-compare-v1.md）
+/docs/spike/llm-*.jsonl
