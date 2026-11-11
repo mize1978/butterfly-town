@@ -1,0 +1,8 @@
+# 街の AI 住民（MVP は3人）。DB にはこの key を文字列で保存する（residents.key）。
+# いまは key だけ。名前・人格・目標・初期の記憶は #9・#11 で足す。
+# key は仮（技術試作の住民 A・B・C に合わせた）。名前が決まったら変えてよいが、
+# 変えるときは residents の CHECK 制約（residents_key_in_catalog）もマイグレーションで変える
+residents:
+  - key: a
+  - key: b
+  - key: c
