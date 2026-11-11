@@ -76,7 +76,7 @@ MVP（README「7-2. MVPの完成範囲」）で使うテーブルの設計です
 | `ai_calls(playthrough_id)` | `purpose = 'conversation'` かつ `applied = 'pending'` の行だけを対象にした部分一意インデックス。返答待ちの会話は街に1つだけ |
 | `ai_calls.request_id` | 一意 |
 | `ai_budget_months.month` | 一意（`YYYY-MM`） |
-| `residents(playthrough_id, key)`、`memories(resident_id, fact_key)`、`world_events(playthrough_id, command_id)`、`relationships(playthrough_id, from_key, to_key)`、`collected_parts(playthrough_id, part_key)` | 一意。同じ住民・同じ記憶・同じ出来事などを二重に作らない |
+| `residents(playthrough_id, key)`、`memories(resident_id, fact_key)`、`world_events(playthrough_id, command_id)`、`relationships(playthrough_id, from_key, toward_key)`、`collected_parts(playthrough_id, part_key)` | 一意。同じ住民・同じ記憶・同じ出来事などを二重に作らない |
 | `repair_jobs.playthrough_id`、`vehicles.playthrough_id` | 一意。1つの街に1件・1台 |
 
 ### ゲストから登録への引継ぎは、全部反映するか何も反映しないか
@@ -282,8 +282,8 @@ erDiagram
   relationships {
     bigint id PK
     bigint playthrough_id FK
-    string from_key "UK(playthrough_id, from_key, to_key)"
-    string to_key
+    string from_key "UK(playthrough_id, from_key, toward_key)"
+    string toward_key "ER図の初版では to_key（Active Record のメソッド名とぶつかるため変更）"
     integer affinity
     string note
     datetime created_at
