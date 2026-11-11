@@ -4,6 +4,7 @@
 // 開いている間は街を止め（人物はその場で止まり、押しても歩かない）、閉じたら同じ位置・同じカメラから続ける。
 // 描画（Phaser）と街の状態（Session）は、重ねる画面の開閉で作り直さない
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import type { PlaythroughState } from "../api/playthrough";
 import { fetchTown } from "../api/town";
 import type { Town } from "../core/world";
 import { Session } from "../game/session";
@@ -51,7 +52,7 @@ const WALK_HINT_KEY = "butterfly-town.walk-hint-seen";
 function walkHintSeen(): boolean { try { return localStorage.getItem(WALK_HINT_KEY) === "1"; } catch { return false; } }
 function saveWalkHintSeen() { try { localStorage.setItem(WALK_HINT_KEY, "1"); } catch { /* 保存できなくても続ける */ } }
 
-export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
+export function TownScreen({ playthrough, onExitToTitle }: { playthrough: PlaythroughState | null; onExitToTitle: () => void }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -149,7 +150,12 @@ export function TownScreen({ onExitToTitle }: { onExitToTitle: () => void }) {
             <div className="town-stage" inert={overlay !== null}>
               <div className="town-info" aria-label="街の情報">
                 <span className="town-name">{session.town.name}</span>
-                <span className="badge">ゲスト・試作版のため保存なし</span>
+                {playthrough && (
+                  <span className="badge" aria-label={`時間帯 ${playthrough.timeIndex + 1}／${playthrough.timeSlots}、特殊介入の残り ${playthrough.interventionsLeft}回`}>
+                    時間帯 {playthrough.timeIndex + 1}/{playthrough.timeSlots}・介入 残り{playthrough.interventionsLeft}
+                  </span>
+                )}
+                <span className="badge">ゲスト・位置と修理は保存なし</span>
                 {badge && <span className="badge errand-badge" aria-live="polite">{badge}</span>}
               </div>
               <div className="world-wrap">
