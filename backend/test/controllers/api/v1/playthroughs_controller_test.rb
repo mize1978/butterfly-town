@@ -29,7 +29,7 @@ class Api::V1::PlaythroughsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 0, body["festival_progress"]
     assert_equal 3, body["interventions_left"]
     assert_equal "in_progress", body["status"]
-    assert_equal ResidentCatalog.all.map { { "key" => _1.fetch("key"), "location_key" => _1.fetch("location") } },
+    assert_equal ResidentCatalog.keys.map { { "key" => _1, "location_key" => ResidentCatalog.initial_location(_1) } },
                  body["residents"]
   end
 

@@ -1,11 +1,31 @@
-# 街の AI 住民（MVP は3人）。DB にはこの key を文字列で保存する（residents.key）。
-# key と最初の場所（location）は仮（技術試作の住民 A・B・C と場所 plaza・shop・home に合わせた）。
-# 名前・人格・目標・初期の記憶は #9・#11 で足す。
-# key を変えるときは residents の CHECK 制約（residents_key_in_catalog）もマイグレーションで変える
+# 街の AI 住民（MVP は3人）と、住民が知りうる出来事・場所。DB には key を文字列で保存する（residents.key など）。
+# すべて仮（技術試作 three-resident-spike の住民 A・B・C と出来事 e1・e2 を、本編の key に合わせて移した）。
+# 名前・正式な人格や目標は未決定。key を変えるときは residents の CHECK 制約（residents_key_in_catalog）もマイグレーションで変える
+#
+# routine：日課。時間帯（朝・昼・夜）ごとに Rails がその場所へ動かす（#8）。最初の場所は朝の場所
+# memories：街を始めたときに本人が知っていること（fact_key は facts の key）
+locations: [plaza, shop, home_a, home_b, home_c]
+
+facts:
+  e1: Bは昨年の準備に参加しなかった
+  e2: Bは急な家族の用事で準備に参加できなかった
+
 residents:
   - key: a
-    location: plaza
+    personality: [約束を重視]
+    goals: [祭りを成功させる]
+    routine: { morning: plaza, noon: plaza, night: home_a }
+    memories:
+      - { fact_key: e1, interpretation: Bは約束を軽く考えているのかもしれない }
   - key: b
-    location: home
+    personality: [拒絶に慎重]
+    goals: [店番と祭りへの協力を両立]
+    routine: { morning: home_b, noon: shop, night: home_b }
+    memories:
+      - { fact_key: e2, interpretation: 事情をAに説明できていない }
   - key: c
-    location: shop
+    personality: [秘密を守りたい]
+    goals: [AとBの協力を助ける]
+    routine: { morning: shop, noon: plaza, night: home_c }
+    memories:
+      - { fact_key: e2, interpretation: 事情を知っているが勝手に明かしてよいか迷う }

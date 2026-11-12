@@ -1,0 +1,20 @@
+# 決まった応答（#8）。実LLM（#11）の代わりに、本人が知っている事実（fact_key）の条件だけで行動案を1つ返す。
+# 技術試作（three-resident-spike）の fixtures/spike/fixed_responses.json を本編の key に合わせて移した。
+# AI が自分で判断できることの証明ではない。成立するかは Rails（ProposalValidator）が決める。
+# 上から順に、actor が同じで requires_known をすべて知り、requires_unknown を1つも知らない最初のルールを使う
+rules:
+  - id: a_knows_absence_and_reason
+    actor: a
+    requires_known: [e1, e2]
+    response: { action_type: invite, target: b, params: { task: setup }, reason: 事情が分かったので、今年は一緒に準備したい }
+  - id: a_knows_absence_only
+    actor: a
+    requires_known: [e1]
+    requires_unknown: [e2]
+    response: { action_type: consult, target: c, params: { about: b }, reason: Bのことが気になるので、Cに相談したい }
+  - id: c_knows_reason
+    actor: c
+    requires_known: [e2]
+    response: { action_type: tell, target: a, params: { fact_key: e2 }, reason: Aの誤解を解きたい }
+  - id: default
+    response: { action_type: continue_routine, target: null, params: {}, reason: いつもの日課を続ける }
