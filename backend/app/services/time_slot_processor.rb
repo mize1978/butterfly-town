@@ -6,7 +6,8 @@
 #   3. 反映（ロック）：試行番号と state_version が開始時と同じときだけ、成り立つ行動を出来事にし、時間帯を進める。
 #      違えば反映しない（古い状態から作った案・前の試行の遅れた結果）
 #
-# 出来事の command_id は「時間帯・住民」で決まるので、同じ時間帯を2回確定しても出来事は増えない
+# 出来事の command_id は「時間帯・住民」で決まるので、同じ時間帯を2回確定しても出来事は増えない。
+# 伝える行動が成立したときだけ、受け手の記憶を作る（#9）
 class TimeSlotProcessor
   Result = Struct.new(:status, :run, :events, :rejected, :error, keyword_init: true)
   EVENT_KINDS = { "invite" => "invited", "consult" => "consulted", "tell" => "told", "work" => "worked", "move" => "moved" }.freeze
@@ -73,13 +74,16 @@ class TimeSlotProcessor
       events, rejected = [], []
       proposals.each do |resident, context, proposal|
         errors = ProposalValidator.call(proposal, context)
+        errors += told_errors(proposal) if errors.empty? && proposal["action_type"] == "tell"
         next rejected << { actor_key: resident.key, action_type: proposal["action_type"], errors: errors } if errors.any?
 
         kind = EVENT_KINDS[proposal["action_type"]]
         next unless kind # continue_routine は出来事にしない
 
-        events << record(resident, kind, proposal, time_index)
+        event = record(resident, kind, proposal, time_index)
+        events << event
         @playthrough.festival_progress += 1 if kind == "worked"
+        learn!(resident, event) if kind == "told"
       end
       @playthrough.state_version += 1 if changed || events.any?
       finish_slot(time_index)
@@ -101,6 +105,22 @@ class TimeSlotProcessor
       time_index: time_index, fact_key: params["fact_key"],
       payload: { "params" => params, "reason" => proposal["reason"], "rule_id" => proposal["rule_id"] }.compact
     )
+  end
+
+  # 伝える相手がもう知っている事実は、伝える行動として成り立たせない（受け手の記憶は1つの事実に1つ）。
+  # 相手の記憶は判断の入力には入れず、ここで Rails だけが見る。同じ時間帯に先に伝わった分も数える
+  def told_errors(proposal)
+    target = @playthrough.residents.find_by!(key: proposal["target"])
+    target.memories.exists?(fact_key: proposal.dig("params", "fact_key")) ? [ "相手はもうその事実を知っている" ] : []
+  end
+
+  # 伝える行動が成立したときだけ、受け手の記憶を作る（#9）。伝わるのは伝えた本人の記憶の内容（伝聞）で、
+  # 受け手の解釈はまだ無い。出どころの出来事（source_event）で、いつ誰から聞いたかをたどれる
+  def learn!(teller, event)
+    told = teller.memories.find_by!(fact_key: event.fact_key)
+    receiver = @playthrough.residents.find_by!(key: event.target_key)
+    receiver.memories.create!(fact_key: event.fact_key, content: told.content, interpretation: nil, source: "told",
+                              acquired_time_index: event.time_index, source_event: event)
   end
 
   # 最後の時間帯（14）を確定したら終わる。time_index は14のまま（勝敗は #15）
