@@ -57,6 +57,6 @@ export function App() {
     case "title": return <TitleScreen onGuest={start} onHowTo={() => setScreen("howto")} starting={starting} notice={notice} />;
     case "howto": return <HowToScreen onStart={start} onBack={() => setScreen("title")} starting={starting} />;
     case "dress": return <DressScreen onEnter={() => setScreen("town")} onBack={() => setScreen("title")} />;
-    case "town": return <TownScreen playthrough={playthrough} onExitToTitle={() => setScreen("title")} />;
+    case "town": return <TownScreen playthrough={playthrough} onPlaythroughChange={setPlaythrough} onExitToTitle={() => setScreen("title")} />;
   }
 }

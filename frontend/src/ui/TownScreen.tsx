@@ -5,6 +5,7 @@
 // 描画（Phaser）と街の状態（Session）は、重ねる画面の開閉で作り直さない
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import type { PlaythroughState } from "../api/playthrough";
+import type { TimeSlot } from "../api/time-slot";
 import { fetchTown } from "../api/town";
 import type { Town } from "../core/world";
 import { Session } from "../game/session";
@@ -19,6 +20,11 @@ import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
+import { aheadNote, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "../game/time-slot";
+
+// 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
+type SlotView = { sending: boolean; error: string | null; note: string | null; last: TimeSlot | null };
+const SLOT_IDLE: SlotView = { sending: false, error: null, note: null, last: null };
 
 type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; town: Town };
 type Overlay = null | "menu" | "talk" | "shop" | "bench" | PartSpotId;
@@ -52,12 +58,16 @@ const WALK_HINT_KEY = "butterfly-town.walk-hint-seen";
 function walkHintSeen(): boolean { try { return localStorage.getItem(WALK_HINT_KEY) === "1"; } catch { return false; } }
 function saveWalkHintSeen() { try { localStorage.setItem(WALK_HINT_KEY, "1"); } catch { /* 保存できなくても続ける */ } }
 
-export function TownScreen({ playthrough, onExitToTitle }: { playthrough: PlaythroughState | null; onExitToTitle: () => void }) {
+type Props = { playthrough: PlaythroughState | null; onPlaythroughChange: (s: PlaythroughState) => void; onExitToTitle: () => void };
+
+export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const talkButton = useRef<HTMLButtonElement>(null);
+  const advancer = useMemo(() => new SlotAdvancer(), []);
+  const [slot, setSlot] = useState<SlotView>(SLOT_IDLE);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -125,6 +135,28 @@ export function TownScreen({ playthrough, onExitToTitle }: { playthrough: Playth
     requestAnimationFrame(() => back.current?.focus());
   };
 
+  // 時間帯を進める：いまの時間帯を Rails で確定し、次の時間帯の状態とその時間帯の出来事を出す。
+  // 送っている間はボタンを押せない。さらに SlotAdvancer が、再描画より先に届いた2回目の押下でも要求を1回にまとめる。
+  // 通信に失敗したら、同じ時間帯をもう一度送れる（届いていた場合も Rails が確定済みとして同じ出来事を返し、二重には進まない）
+  const finished = playthrough?.status === "finished";
+  const advance = async () => {
+    if (!playthrough || finished) return;
+    setSlot((v) => ({ ...v, sending: true, error: null, note: null }));
+    try {
+      const r = await advancer.advance(playthrough.timeIndex);
+      if (r.ok) {
+        onPlaythroughChange(r.state);
+        setSlot({ ...SLOT_IDLE, note: aheadNote(playthrough.timeIndex, r), last: r.timeSlot });
+      } else {
+        const n = outcomeNote(r.error);
+        if (n.adopt) onPlaythroughChange(r.state);
+        setSlot((v) => ({ ...v, sending: false, note: n.text }));
+      }
+    } catch (e) {
+      setSlot((v) => ({ ...v, sending: false, error: (e as Error).message }));
+    }
+  };
+
   const menuToggle = session && (
     <button type="button" ref={menuButton} className="btn menu-button" aria-haspopup="dialog" aria-expanded={overlay === "menu"}
       aria-controls="town-menu" disabled={overlay !== null && overlay !== "menu"}
@@ -148,6 +180,7 @@ export function TownScreen({ playthrough, onExitToTitle }: { playthrough: Playth
           <>
             {/* 街の絵・情報・操作をひとまとまりにして画面の中央に置く（絵の縦横比は 1100×660 のまま） */}
             <div className="town-stage" inert={overlay !== null}>
+              <div className="town-top">
               <div className="town-info" aria-label="街の情報">
                 <span className="town-name">{session.town.name}</span>
                 {playthrough && (
@@ -157,6 +190,26 @@ export function TownScreen({ playthrough, onExitToTitle }: { playthrough: Playth
                 )}
                 <span className="badge">ゲスト・位置と修理は保存なし</span>
                 {badge && <span className="badge errand-badge" aria-live="polite">{badge}</span>}
+              </div>
+              {playthrough && (
+                <div className="slot-bar">
+                  <button type="button" className="btn slot-button" disabled={slot.sending || finished} aria-describedby="slot-result" onClick={advance}>
+                    {slot.sending ? "進めています…" : finished ? "時間帯は終わりました" : slot.error ? "もう一度送る" : "時間帯を進める"}
+                    {!finished && <small>{nextStepLabel(playthrough)}</small>}
+                  </button>
+                  <div id="slot-result" className="slot-result" aria-live="polite">
+                    {slot.error && <p className="slot-error" role="alert">{slot.error}。「もう一度送る」で同じ時間帯を送り直します（二重には進みません）。</p>}
+                    {slot.note && <p className="slot-note">{slot.note}</p>}
+                    {finished && !slot.error && <p className="slot-note">15の時間帯がすべて終わりました（祭りの結果の表示はまだありません）。</p>}
+                    {slot.last && (
+                      <p className="slot-events">
+                        <span className="slot-title">{slotLabel(slot.last.timeIndex)}：</span>
+                        {slot.last.events.length ? slot.last.events.map(describeEvent).join("／") : "出来事はありませんでした"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               </div>
               <div className="world-wrap">
                 <GameView session={session} />
