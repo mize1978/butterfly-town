@@ -73,7 +73,7 @@ p { margin: 0; }
 .town-frame { height: 100vh; height: 100dvh; min-height: 0; }
 .town-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 16px 12px; }
 /* 幅は「画面幅」と「残りの高さ×5/3」の小さい方（帯・情報・話すボタンの分 約180px を引く） */
-.town-stage { --stage-w: min(100%, calc((100dvh - 180px) * 5 / 3)); width: var(--stage-w); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.town-stage { --stage-w: min(100%, calc((100dvh - 230px) * 5 / 3)); width: var(--stage-w); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .town-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; }
 .town-name { font-weight: 700; }
 .badge { font-size: 13px; color: var(--note); border: 1px solid var(--note); border-radius: 999px; padding: 1px 10px; }
@@ -93,6 +93,19 @@ p { margin: 0; }
 .town-actions .hint { text-align: left; }
 /* 会話・メニューを重ねている間は、押せない「話す」の列を見せない（会話ウィンドウと重なって紛らわしいため） */
 .town-stage[inert] .town-actions { visibility: hidden; }
+
+/* 時間帯を進める（#8 の API を画面につなぐ）：ボタンと、直前に確定した時間帯の出来事 */
+/* 街の情報と時間帯の帯を縦に積む（スマホでは街の絵の上に重ねる） */
+.town-top { display: flex; flex-direction: column; gap: 8px; }
+.slot-bar { display: flex; align-items: center; gap: 12px; }
+.slot-button { flex: none; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.3; min-width: 150px; }
+.slot-button small { font-size: 11px; font-weight: 400; }
+.slot-result { flex: 1; min-width: 0; font-size: 13px; }
+.slot-result p { margin: 0; }
+.slot-title { font-weight: 700; }
+.slot-error { color: var(--clay); }
+.slot-note { color: var(--muted); }
+.town-stage[inert] .slot-bar { visibility: hidden; }
 
 /* S06 住民との会話（試作）：街の上に重ねる画面下の会話ウィンドウ。街は暗くせず、主人公と話し相手が見えたままにする */
 .talk-window { position: absolute; z-index: 10; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 24px));
@@ -186,6 +199,17 @@ p { margin: 0; }
     box-shadow: 0 3px 10px rgba(20, 40, 35, .25); }
   .town-actions .hint { text-align: center; font-size: 12px; color: var(--ink); background: rgba(251, 247, 236, .9); border-radius: 999px; padding: 2px 12px; }
   .town-actions .hint:empty { display: none; }
+  /* 時間帯：街の情報の下に小さく重ねる。結果は1〜2行の帯にし、長いときだけその中をスクロールする */
+  .town-top { position: absolute; z-index: 2; top: 8px; gap: 6px; pointer-events: none;
+    left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); }
+  .town-top .town-info { position: static; }
+  .slot-bar { align-items: flex-start; gap: 6px; }
+  .slot-button { pointer-events: auto; min-width: 0; min-height: 44px; padding: 2px 14px; border-radius: 999px; font-size: 13px;
+    box-shadow: 0 3px 10px rgba(20, 40, 35, .25); }
+  .slot-button small { font-size: 10px; }
+  .slot-result { font-size: 12px; max-height: 4.6em; overflow-y: auto; pointer-events: auto; }
+  .slot-result:empty { display: none; }
+  .slot-result p { background: rgba(251, 247, 236, .92); border-radius: 10px; padding: 2px 10px; }
 
   /* 会話ウィンドウ：名前・本文・次へ・閉じるだけの小さな半透明の枠。見出しは読み上げ用に残して画面からは隠し（名札と重複するため）、
      開発用の説明は出さない（「サンプル会話・AI未接続」の印は残す）。長い文は本文だけスクロールし、ボタンは常に枠の下に見える */
