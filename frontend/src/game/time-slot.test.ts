@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PlaythroughState } from "../api/playthrough";
 import type { TimeSlotResult } from "../api/time-slot";
 import { PlaythroughError } from "../api/playthrough";
-import { aheadNote, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "./time-slot";
+import { aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "./time-slot";
 
 const state = (timeIndex: number, status = "in_progress"): PlaythroughState => ({
   status, timeIndex, timeSlots: 15, festivalProgress: 0, interventionsLeft: 3, residents: []
@@ -38,6 +38,26 @@ describe("409 の理由の案内", () => {
     expect(outcomeNote("finished")).toEqual({ adopt: true, text: "この街の時間帯は、もう終わっています。" });
     expect(outcomeNote("running")).toMatchObject({ adopt: false });
     expect(outcomeNote("version_mismatch")).toMatchObject({ adopt: false });
+    expect(outcomeNote("budget")).toEqual({ adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" });
+    expect(outcomeNote("unknown_result")).toEqual({ adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" });
+  });
+});
+
+describe("予算不足の中断（S22 の最小版）", () => {
+  it("理由・確定していない時間帯・確定済みの進み具合・保存・再開の時期（日本時間）を出す", () => {
+    expect(budgetStop(state(4), "2026-12-01T00:00:00Z")).toEqual({
+      reason: "今月の AI 予算の上限に近づいたため、新しい AI の呼び出しを止めています。",
+      slot: "2日目の昼は確定していません。ゲームが住民の代わりに判断を決めることはしません。",
+      progress: "確定済み：2日目の朝まで（15のうち4つ）",
+      saved: "ここまでの街はサーバーに残っています。同じブラウザで続きから再開できます。",
+      resume: "AI の処理を再開できるのは 2026年12月1日 9:00（日本時間）以降です。"
+    });
+  });
+
+  it("最初の時間帯で止まったときは、確定済みの時間帯は無い。再開の時期が分からないときはそう書く", () => {
+    const s = budgetStop(state(0), null);
+    expect(s.progress).toBe("確定済みの時間帯はまだありません");
+    expect(s.resume).toBe("AI の処理を再開できる時期は、いまは分かりません。");
   });
 });
 

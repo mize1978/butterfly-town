@@ -1,0 +1,12 @@
+# AI の月予算（#10、README「8. 懸念点④」「10-4」）。DB には「100万分の1円」の整数で入れる。
+# ゲームの判断・会話・要約・再試行・開発検証のすべてを、同じ月の予算で数える
+monthly_budget_yen: 3000      # 月の予算
+stop_new_calls_at_yen: 2000   # 新しい呼び出しを止める額。残り約1,000円は為替・税・請求差の予備
+fx_yen_per_usd: 150           # 仮の値（README：為替の値は未決定）
+# 月の区切りは UTC（Anthropic の請求月に合わせる。仮）
+price_version: "2026-11-11"
+# 公式単価（USD / 100万トークン、プロンプト10万トークン以下）。2026-11-11 に
+# platform.claude.com/docs/en/about-claude/pricing で確認（技術試作 #5 と同じ値）。使うモデルは未決定（#11）
+prompt_token_limit: 100000
+models:
+  claude-haiku-5-5: { input: 0.10, output: 0.50, cache_write_5m: 0.125, cache_read: 0.01 }

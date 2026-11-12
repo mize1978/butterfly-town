@@ -1,4 +1,5 @@
 require "test_helper"
+require "minitest/mock"
 
 # #8 POST /api/v1/playthrough/time_slots。コントローラは受け付けと結果の返却だけ（処理は TimeSlotProcessor）
 class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
@@ -39,6 +40,22 @@ class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
     confirm(5)
     assert_response :conflict
     assert_equal "time_index_mismatch", body["error"]
+  end
+
+  test "予算が足りずに止めたときは 409 で、理由 budget と再開できる時期を返す。時間帯は進まない" do
+    post api_v1_playthrough_path
+    resume = Time.utc(2026, 12, 1)
+    stopped = Class.new do
+      define_method(:initialize) { |pt| @pt = pt }
+      define_method(:call) do |time_index:|
+        run = TimeSlotRun.create!(playthrough: @pt, time_index: time_index, status: "suspended", suspend_reason: "budget", base_state_version: 0)
+        TimeSlotProcessor::Result.new(status: :suspended, run: run, events: [], rejected: [], error: "budget", resume_at: resume)
+      end
+    end
+    TimeSlotProcessor.stub(:new, ->(pt, **) { stopped.new(pt) }) { confirm(0) }
+    assert_response :conflict
+    assert_equal [ "budget", "2026-12-01T00:00:00Z", 0 ], [ body["error"], body["resume_at"], body.dig("state", "time_index") ]
+    assert_equal "suspended", body.dig("time_slot", "status")
   end
 
   test "time_index が無い・数でないときは 422" do
