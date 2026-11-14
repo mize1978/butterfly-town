@@ -4,6 +4,7 @@ require "test_helper"
 class AiBudgetTest < ActiveSupport::TestCase
   MODEL = "claude-haiku-5-5"
   NOW = Time.utc(2026, 11, 20, 12)
+  JST = ActiveSupport::TimeZone["Asia/Tokyo"]
 
   setup { @budget = AiBudget.default }
 
@@ -92,11 +93,12 @@ class AiBudgetTest < ActiveSupport::TestCase
 
   # --- 上限 ---
 
-  test "予約の合計と使った額に足して2,000円を超える呼び出しはしない。再開できる時期（翌月1日 UTC）を返し、何も記録しない" do
+  test "予約の合計と使った額に足して2,000円を超える呼び出しはしない。再開できる時期（翌月1日0時・日本時間）を返し、何も記録しない" do
     reserve
     month.update_columns(spent_micro_yen: 2_000 * 1_000_000 - 52_500 - 52_499)
     error = assert_raises(AiBudget::Exhausted) { reserve }
-    assert_equal Time.utc(2026, 12, 1), error.resume_at
+    assert_equal JST.local(2026, 12, 1), error.resume_at
+    assert_equal "2026-12-01T00:00:00+09:00", error.resume_at.iso8601
     assert_equal 1, AiCall.count
     assert_equal 52_500, month.reserved_micro_yen
 
@@ -114,8 +116,16 @@ class AiBudgetTest < ActiveSupport::TestCase
     reserve
     month.update_columns(spent_micro_yen: 2_000 * 1_000_000)
     assert_raises(AiBudget::Exhausted) { reserve }
-    assert reserve(now: Time.utc(2026, 12, 1))
+    assert reserve(now: JST.local(2026, 12, 1))
     assert_equal %w[2026-11 2026-12], AiBudgetMonth.order(:month).pluck(:month)
+  end
+
+  test "月の区切りは日本時間。11月30日 23:59（日本時間）までは11月、12月1日 0:00（日本時間）からは12月" do
+    assert_equal "2026-11", @budget.month_key(JST.local(2026, 11, 30, 23, 59, 59))
+    assert_equal "2026-12", @budget.month_key(JST.local(2026, 12, 1)) # UTC ではまだ 11月30日 15:00
+    assert_equal "2026-12", @budget.month_key(Time.utc(2026, 11, 30, 15))
+    assert_equal "2026-11", @budget.month_key(Time.utc(2026, 11, 1)) # 日本時間では 11月1日 9:00
+    assert_equal JST.local(2027, 1, 1), @budget.resume_at(JST.local(2026, 12, 31, 23, 59))
   end
 
   # --- ゲームの判断・会話・要約・再試行・開発検証は同じ予算 ---

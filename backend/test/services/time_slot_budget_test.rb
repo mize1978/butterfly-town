@@ -52,7 +52,7 @@ class TimeSlotBudgetTest < ActiveSupport::TestCase
     version = @pt.reload.state_version
     result = confirm(responder)
     assert_equal [ :suspended, "budget" ], [ result.status, result.error ]
-    assert_equal Time.current.utc.next_month.beginning_of_month, result.resume_at
+    assert_equal Time.current.in_time_zone("Asia/Tokyo").next_month.beginning_of_month, result.resume_at
     assert_equal 0, responder.calls, "Rails が代わりに判断することもしない"
     run = TimeSlotRun.find_by!(playthrough: @pt, time_index: 1)
     assert_equal %w[suspended budget], run.values_at(:status, :suspend_reason)
@@ -71,7 +71,7 @@ class TimeSlotBudgetTest < ActiveSupport::TestCase
     assert_equal month.limit_micro_yen - 52_500 + 38_430, month.spent_micro_yen
     assert_empty @pt.world_events.where(time_index: 1)
 
-    travel_to(Time.current.utc.next_month.beginning_of_month + 1.hour) do
+    travel_to(Time.current.in_time_zone("Asia/Tokyo").next_month.beginning_of_month + 1.hour) do
       result = confirm(BilledResponder.new)
       assert_equal :confirmed, result.status
       assert_equal [ "confirmed", 2 ], TimeSlotRun.find_by!(playthrough: @pt, time_index: 1).values_at(:status, :attempt)

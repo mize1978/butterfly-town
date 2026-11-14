@@ -41,9 +41,9 @@ describe("時間帯を確定する（confirmTimeSlot）", () => {
   });
 
   it("予算が足りずに止めたとき（409・budget）は、再開できる時期（resume_at）も返す", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json({ state: STATE, error: "budget", resume_at: "2026-12-01T00:00:00Z",
+    vi.stubGlobal("fetch", vi.fn(async () => json({ state: STATE, error: "budget", resume_at: "2026-12-01T00:00:00+09:00",
       time_slot: { ...SLOT, status: "suspended", events: [] } }, 409)));
-    await expect(confirmTimeSlot(2)).resolves.toMatchObject({ ok: false, error: "budget", resumeAt: "2026-12-01T00:00:00Z" });
+    await expect(confirmTimeSlot(2)).resolves.toMatchObject({ ok: false, error: "budget", resumeAt: "2026-12-01T00:00:00+09:00" });
   });
 
   it("接続できないときは、接続の失敗として投げる", async () => {

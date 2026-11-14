@@ -44,7 +44,7 @@ class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
 
   test "予算が足りずに止めたときは 409 で、理由 budget と再開できる時期を返す。時間帯は進まない" do
     post api_v1_playthrough_path
-    resume = Time.utc(2026, 12, 1)
+    resume = ActiveSupport::TimeZone["Asia/Tokyo"].local(2026, 12, 1) # 予算の月の区切りは日本時間
     stopped = Class.new do
       define_method(:initialize) { |pt| @pt = pt }
       define_method(:call) do |time_index:|
@@ -54,7 +54,7 @@ class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
     end
     TimeSlotProcessor.stub(:new, ->(pt, **) { stopped.new(pt) }) { confirm(0) }
     assert_response :conflict
-    assert_equal [ "budget", "2026-12-01T00:00:00Z", 0 ], [ body["error"], body["resume_at"], body.dig("state", "time_index") ]
+    assert_equal [ "budget", "2026-12-01T00:00:00+09:00", 0 ], [ body["error"], body["resume_at"], body.dig("state", "time_index") ]
     assert_equal "suspended", body.dig("time_slot", "status")
   end
 
