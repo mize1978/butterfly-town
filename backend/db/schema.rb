@@ -10,9 +10,59 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "ai_budget_months", force: :cascade do |t|
+    t.string "month", null: false
+    t.bigint "limit_micro_yen", null: false
+    t.bigint "reserved_micro_yen", default: 0, null: false
+    t.bigint "spent_micro_yen", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["month"], name: "index_ai_budget_months_on_month", unique: true
+    t.check_constraint "limit_micro_yen > 0 AND reserved_micro_yen >= 0 AND spent_micro_yen >= 0", name: "ai_budget_months_amounts"
+    t.check_constraint "month::text ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::text", name: "ai_budget_months_month_format"
+  end
+
+  create_table "ai_calls", force: :cascade do |t|
+    t.bigint "playthrough_id"
+    t.bigint "time_slot_run_id"
+    t.integer "attempt"
+    t.integer "base_state_version"
+    t.integer "base_time_index"
+    t.string "applied"
+    t.bigint "guest_id"
+    t.bigint "user_id"
+    t.bigint "ai_budget_month_id", null: false
+    t.string "request_id", null: false
+    t.string "purpose", null: false
+    t.string "status", default: "reserved", null: false
+    t.string "price_version", null: false
+    t.integer "input_tokens_counted", null: false
+    t.integer "max_output_tokens", null: false
+    t.bigint "reserved_cost_micro_yen", null: false
+    t.bigint "actual_cost_micro_yen"
+    t.integer "input_tokens"
+    t.integer "output_tokens"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ai_budget_month_id"], name: "index_ai_calls_on_ai_budget_month_id"
+    t.index ["guest_id"], name: "index_ai_calls_on_guest_id"
+    t.index ["playthrough_id"], name: "index_ai_calls_on_playthrough_id"
+    t.index ["playthrough_id"], name: "index_ai_calls_one_pending_conversation", unique: true, where: "(((purpose)::text = 'conversation'::text) AND ((applied)::text = 'pending'::text))"
+    t.index ["request_id"], name: "index_ai_calls_on_request_id", unique: true
+    t.index ["time_slot_run_id"], name: "index_ai_calls_on_time_slot_run_id"
+    t.index ["user_id"], name: "index_ai_calls_on_user_id"
+    t.check_constraint "(status::text <> ALL (ARRAY['succeeded'::character varying, 'unknown'::character varying]::text[])) OR actual_cost_micro_yen IS NOT NULL", name: "ai_calls_settled_cost"
+    t.check_constraint "applied IS NULL OR (applied::text = ANY (ARRAY['pending'::character varying, 'applied'::character varying, 'discarded'::character varying]::text[]))", name: "ai_calls_applied"
+    t.check_constraint "input_tokens_counted >= 0 AND max_output_tokens > 0", name: "ai_calls_tokens"
+    t.check_constraint "purpose::text = ANY (ARRAY['decision'::character varying, 'conversation'::character varying, 'summary'::character varying, 'dev'::character varying]::text[])", name: "ai_calls_purpose"
+    t.check_constraint "reserved_cost_micro_yen >= 0 AND (actual_cost_micro_yen IS NULL OR actual_cost_micro_yen >= 0)", name: "ai_calls_costs"
+    t.check_constraint "status::text <> 'unknown'::text OR actual_cost_micro_yen = reserved_cost_micro_yen", name: "ai_calls_unknown_full"
+    t.check_constraint "status::text = ANY (ARRAY['reserved'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'unknown'::character varying]::text[])", name: "ai_calls_status"
+  end
 
   create_table "conversation_messages", force: :cascade do |t|
     t.bigint "playthrough_id", null: false
@@ -146,6 +196,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_000001) do
     t.check_constraint "time_index >= 0 AND time_index <= 14", name: "world_events_time_index"
   end
 
+  add_foreign_key "ai_calls", "ai_budget_months"
+  add_foreign_key "ai_calls", "guests"
+  add_foreign_key "ai_calls", "playthroughs"
+  add_foreign_key "ai_calls", "time_slot_runs"
+  add_foreign_key "conversation_messages", "ai_calls"
   add_foreign_key "conversation_messages", "playthroughs"
   add_foreign_key "memories", "residents"
   add_foreign_key "memories", "world_events", column: "source_event_id"

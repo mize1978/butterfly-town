@@ -20,17 +20,17 @@ import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
-import { aheadNote, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "../game/time-slot";
+import { aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
 
 // 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
 type SlotView = { sending: boolean; error: string | null; note: string | null; last: TimeSlot | null };
 const SLOT_IDLE: SlotView = { sending: false, error: null, note: null, last: null };
 
 type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; town: Town };
-type Overlay = null | "menu" | "talk" | "shop" | "bench" | PartSpotId;
+type Overlay = null | "menu" | "talk" | "shop" | "bench" | "budget" | PartSpotId;
 const opens = (id: SpotId): Overlay => (id === "resident" ? "talk" : id);
 const FAR_NOTE_MS = 2500; // 遠くをタップしたときの案内を出しておく時間
-const FRAME_LABEL: Record<"menu" | "talk" | "shop" | "bench", string> = { menu: "街・徒歩", talk: "住民との会話", shop: "スクーター修理・依頼", bench: "作業台・修理" };
+const FRAME_LABEL: Record<"menu" | "talk" | "shop" | "bench" | "budget", string> = { menu: "街・徒歩", talk: "住民との会話", shop: "スクーター修理・依頼", bench: "作業台・修理", budget: "中断" };
 const frameLabel = (o: Exclude<Overlay, null>) => (partOfSpot(o as SpotId) ? "部品の発見" : FRAME_LABEL[o as keyof typeof FRAME_LABEL]);
 
 // 依頼の進み具合の札（受ける前は出さない）
@@ -68,6 +68,8 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const talkButton = useRef<HTMLButtonElement>(null);
   const advancer = useMemo(() => new SlotAdvancer(), []);
   const [slot, setSlot] = useState<SlotView>(SLOT_IDLE);
+  const [stop, setStop] = useState<BudgetStop | null>(null); // 予算不足で止めたときの中断の案内（S22 の最小版）
+  const slotButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -151,6 +153,8 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
         const n = outcomeNote(r.error);
         if (n.adopt) onPlaythroughChange(r.state);
         setSlot((v) => ({ ...v, sending: false, note: n.text }));
+        // 予算不足：時間帯は確定していない。中断の案内を街の上に重ねて出す
+        if (r.error === "budget") { setStop(budgetStop(r.state, r.resumeAt)); setOverlay((o) => o ?? "budget"); }
       }
     } catch (e) {
       setSlot((v) => ({ ...v, sending: false, error: (e as Error).message }));
@@ -193,7 +197,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
               </div>
               {playthrough && (
                 <div className="slot-bar">
-                  <button type="button" className="btn slot-button" disabled={slot.sending || finished} aria-describedby="slot-result" onClick={advance}>
+                  <button type="button" ref={slotButton} className="btn slot-button" disabled={slot.sending || finished} aria-describedby="slot-result" onClick={advance}>
                     {slot.sending ? "進めています…" : finished ? "時間帯は終わりました" : slot.error ? "もう一度送る" : "時間帯を進める"}
                     {!finished && <small>{nextStepLabel(playthrough)}</small>}
                   </button>
@@ -255,6 +259,23 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
               <ConversationView title="部品の発見" speaker={PARTS[partOpen].name} badge="試作・保存なし" lines={partFind(partOpen)}
                 action={{ label: "部品を受け取る", run: () => { session.act((r) => collect(r, partOpen)); close(talkButton); } }}
                 onClose={() => close(talkButton)} />
+            )}
+            {overlay === "budget" && stop && (
+              // 中断画面（S22）の最小版：AI を使えない理由・確定していない時間帯・確定済みの進み具合・保存・再開の時期
+              <section className="suspend-panel" role="dialog" aria-modal="true" aria-labelledby="suspend-title">
+                <h2 id="suspend-title">AI の処理を中断しました</h2>
+                <p>{stop.reason}</p>
+                <p>{stop.slot}</p>
+                <dl>
+                  <dt>進み具合</dt><dd>{stop.progress}</dd>
+                  <dt>保存</dt><dd>{stop.saved}</dd>
+                  <dt>再開</dt><dd>{stop.resume}</dd>
+                </dl>
+                <div className="suspend-actions">
+                  <button type="button" className="btn primary" autoFocus onClick={() => close(slotButton)}>街に戻る</button>
+                  <button type="button" className="btn" onClick={onExitToTitle}>トップへ戻る</button>
+                </div>
+              </section>
             )}
             {overlay === "bench" && (BENCH_NEW
               ? <RepairBenchTouch session={session} onClose={() => close(talkButton)} />

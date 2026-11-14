@@ -5,7 +5,8 @@ import { parsePlaythrough, PlaythroughError, type PlaythroughState } from "./pla
 
 export type TimeSlotEvent = { kind: string; actorKey: string; targetKey: string | null; factKey: string | null };
 export type TimeSlot = { timeIndex: number; status: string; attempt: number; events: TimeSlotEvent[] };
-export type TimeSlotResult = { ok: boolean; error: string | null; state: PlaythroughState; timeSlot: TimeSlot | null };
+// resumeAt：予算が足りずに止めたとき（error = budget）、AI の処理を再開できる時期（ISO 8601）
+export type TimeSlotResult = { ok: boolean; error: string | null; resumeAt?: string | null; state: PlaythroughState; timeSlot: TimeSlot | null };
 
 const URL = "/api/v1/playthrough/time_slots";
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -44,6 +45,7 @@ export async function confirmTimeSlot(timeIndex: number): Promise<TimeSlotResult
   return {
     ok: res.status === 200,
     error: typeof body.error === "string" ? body.error : null,
+    resumeAt: typeof body.resume_at === "string" ? body.resume_at : null,
     state: parsePlaythrough(body.state),
     timeSlot: parseTimeSlot(body.time_slot)
   };
