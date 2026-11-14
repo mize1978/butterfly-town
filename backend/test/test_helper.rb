@@ -4,6 +4,8 @@ require "simplecov"
 SimpleCov.start "rails" do
   enable_coverage :branch
   skip "/test/"
+  # 目標（行80%）はサービス層で見る。HTML の結果では「サービス層」のタブに出る
+  add_group "サービス層", "app/services"
 end
 
 ENV["RAILS_ENV"] ||= "test"
