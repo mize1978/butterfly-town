@@ -7,7 +7,8 @@
 #   3. 結果が分からない（タイムアウト・通信エラーなど）：予約額の全額を使ったものとして数える。自動では呼び直さない
 #      課金されていないと分かっている失敗（NotBilled）だけ、予約を外して0円にする
 #
-# 金額は「100万分の1円」の整数。単価・為替・上限は config/ai_budget.yml。月の区切りは UTC（仮）
+# 金額は「100万分の1円」の整数。単価・為替・上限・月の区切りのタイムゾーンは config/ai_budget.yml。
+# 月の区切りは日本時間（毎月1日 0:00）
 class AiBudget
   class Exhausted < StandardError
     attr_reader :resume_at
@@ -33,10 +34,12 @@ class AiBudget
     @config = config
     @fx = Rational(config.fetch("fx_yen_per_usd").to_s)
     @limit_micro_yen = Integer(config.fetch("stop_new_calls_at_yen")) * MICRO
+    @zone = ActiveSupport::TimeZone.new(config.fetch("month_time_zone")) or raise ArgumentError, "タイムゾーンが正しくない"
   end
 
-  def month_key(now = Time.current) = now.utc.strftime("%Y-%m")
-  def resume_at(now = Time.current) = now.utc.next_month.beginning_of_month
+  def month_key(now = Time.current) = now.in_time_zone(@zone).strftime("%Y-%m")
+  # 再開できる時期：翌月1日 0:00（月の区切りのタイムゾーン）
+  def resume_at(now = Time.current) = now.in_time_zone(@zone).next_month.beginning_of_month
 
   # 最大額：入力がすべて課金され、出力が上限まで出た場合（考える分も出力として数える）。端数は切り上げ
   def worst_case_micro_yen(model:, input_tokens:, max_output_tokens:)
