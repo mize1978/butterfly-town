@@ -35,7 +35,8 @@ export function outcomeNote(error: string | null): { adopt: boolean; text: strin
     case "finished": return { adopt: true, text: "この街の時間帯は、もう終わっています。" };
     case "budget": return { adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" };
     case "unknown_result": return { adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" };
-    case "ai_unavailable": return { adopt: true, text: "AI に問い合わせられなかったため止めました。費用はかかっていません。もう一度押すと、やり直します。" };
+    // 費用の話はしない：同じ時間帯で先に費用のかかった呼び出し（同じ試行の別の住民・前の試行）があり得る
+    case "ai_unavailable": return { adopt: true, text: "AI に問い合わせられなかったため止めました。もう一度押すと、やり直します。" };
     case "running": return { adopt: false, text: "この時間帯はいま進めている途中です。少し待ってから、もう一度押してください。" };
     default: return { adopt: false, text: "途中で街の状態が変わったため、反映しませんでした。もう一度押してください。" };
   }
@@ -61,6 +62,12 @@ export function budgetStop(s: PlaythroughState, resumeAt: string | null | undefi
     saved: "ここまでの街はサーバーに残っています。同じブラウザで続きから再開できます。",
     resume: at ? `AI の処理を再開できるのは ${at}（日本時間）以降です。` : "AI の処理を再開できる時期は、いまは分かりません。"
   };
+}
+
+// 重ねていた画面を閉じたあとに出す画面。送っている間にメニュー・会話などを開いていて予算不足が届いたら、
+// その案内（と再開の時期）は保留しておき、閉じたときに出す。中断の案内そのものを閉じたら、もう出さない
+export function afterClose(closing: string | null, budgetPending: boolean): "budget" | null {
+  return budgetPending && closing !== "budget" ? "budget" : null;
 }
 
 // 確定済みの時間帯を送り直したとき、Rails がその次より先にいる（ほかの画面で進めていた）なら、合わせたことを伝える

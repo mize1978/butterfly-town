@@ -34,7 +34,7 @@ class TimeSlotProcessor
     rescue AiBudget::Exhausted => e
       return suspend(run, attempt, "budget", resume_at: e.resume_at)
     rescue AiBudget::PromptTooLong, AiBudget::UnknownModel, AiBudget::NotBilled, LlmResponder::Unavailable => e
-      Rails.logger.warn("[time_slot] AI を呼べなかったため中断（費用なし）：#{e.class}")
+      Rails.logger.warn("[time_slot] AI を呼べなかったため中断（この呼び出しは課金されていない）：#{e.class}")
       return suspend(run, attempt, "ai_unavailable")
     rescue StandardError => e
       raise unless billable?
