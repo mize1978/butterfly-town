@@ -40,6 +40,8 @@ describe("409 の理由の案内", () => {
     expect(outcomeNote("version_mismatch")).toMatchObject({ adopt: false });
     expect(outcomeNote("budget")).toEqual({ adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" });
     expect(outcomeNote("unknown_result")).toEqual({ adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" });
+    // #30：AI を呼ぶ前に止まった・API が受け付けなかった。費用はかかっていないので、押し直してよいと伝える
+    expect(outcomeNote("ai_unavailable")).toEqual({ adopt: true, text: "AI に問い合わせられなかったため止めました。費用はかかっていません。もう一度押すと、やり直します。" });
   });
 });
 
