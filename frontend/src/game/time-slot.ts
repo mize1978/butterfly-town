@@ -33,9 +33,33 @@ export function outcomeNote(error: string | null): { adopt: boolean; text: strin
   switch (error) {
     case "time_index_mismatch": return { adopt: true, text: "ほかの画面で時間帯が進んでいました。いまの時間帯に合わせました。" };
     case "finished": return { adopt: true, text: "この街の時間帯は、もう終わっています。" };
+    case "budget": return { adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" };
+    case "unknown_result": return { adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" };
     case "running": return { adopt: false, text: "この時間帯はいま進めている途中です。少し待ってから、もう一度押してください。" };
     default: return { adopt: false, text: "途中で街の状態が変わったため、反映しませんでした。もう一度押してください。" };
   }
+}
+
+// 予算不足で止めたときの案内（中断画面 S22 の最小版）。README「10-4 予算不足時の方針」の
+// 「AI を利用できない理由・確定済みの進行状態・保存可否・再開時期」を出す
+export type BudgetStop = { reason: string; slot: string; progress: string; saved: string; resume: string };
+const JST = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+function jst(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const p = Object.fromEntries(JST.formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.year}年${p.month}月${p.day}日 ${p.hour}:${p.minute}`;
+}
+export function budgetStop(s: PlaythroughState, resumeAt: string | null | undefined): BudgetStop {
+  const i = s.timeIndex;
+  const at = resumeAt ? jst(resumeAt) : null;
+  return {
+    reason: "今月の AI 予算の上限に近づいたため、新しい AI の呼び出しを止めています。",
+    slot: `${slotLabel(i)}は確定していません。ゲームが住民の代わりに判断を決めることはしません。`,
+    progress: i === 0 ? "確定済みの時間帯はまだありません" : `確定済み：${slotLabel(i - 1)}まで（${s.timeSlots}のうち${i}つ）`,
+    saved: "ここまでの街はサーバーに残っています。同じブラウザで続きから再開できます。",
+    resume: at ? `AI の処理を再開できるのは ${at}（日本時間）以降です。` : "AI の処理を再開できる時期は、いまは分かりません。"
+  };
 }
 
 // 確定済みの時間帯を送り直したとき、Rails がその次より先にいる（ほかの画面で進めていた）なら、合わせたことを伝える

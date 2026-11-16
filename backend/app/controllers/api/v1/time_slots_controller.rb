@@ -28,6 +28,7 @@ module Api
       def body(playthrough, result)
         json = { state: playthrough.state }
         json[:error] = result.error if result.error
+        json[:resume_at] = result.resume_at.iso8601 if result.resume_at # 予算不足で止めたとき、再開できる時期
         if result.run
           json[:time_slot] = {
             time_index: result.run.time_index, status: result.run.status, attempt: result.run.attempt,
