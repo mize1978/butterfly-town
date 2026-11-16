@@ -12,12 +12,14 @@
 # 費用のかかる応答（実LLM。billable? が true のもの）は、呼ぶ前に AiBudget で予約する（#10）。
 # 予算が足りなければ、その時間帯を確定させずに止め（suspended・budget）、再開できる時期を返す。
 # Rails が住民の代わりに判断することはしない。結果が分からない呼び出しは自動では呼び直さない（suspended・unknown_result）。
-# 決まった応答（FixedResponder）は費用がかからないので、予算を通さない
+# AI を呼ぶ前に止まった・API が受け付けなかった（課金されていない）ときは suspended・ai_unavailable（#30）。
+# API を待つ間（数える・呼ぶ）は、トランザクションの外にいる（街の行も月の予算の行もロックしない）。
+# 決まった応答（FixedResponder）は費用がかからないので、予算を通さない。どちらを使うかは ResidentResponder が決める
 class TimeSlotProcessor
   Result = Struct.new(:status, :run, :events, :rejected, :error, :resume_at, keyword_init: true)
   EVENT_KINDS = { "invite" => "invited", "consult" => "consulted", "tell" => "told", "work" => "worked", "move" => "moved" }.freeze
 
-  def initialize(playthrough, responder: FixedResponder.default, budget: AiBudget.default)
+  def initialize(playthrough, responder: ResidentResponder.default, budget: AiBudget.default)
     @playthrough, @responder, @budget = playthrough, responder, budget
   end
 
@@ -31,6 +33,9 @@ class TimeSlotProcessor
       decide(locations, run, attempt, base_version, time_index)
     rescue AiBudget::Exhausted => e
       return suspend(run, attempt, "budget", resume_at: e.resume_at)
+    rescue AiBudget::PromptTooLong, AiBudget::UnknownModel, AiBudget::NotBilled, LlmResponder::Unavailable => e
+      Rails.logger.warn("[time_slot] AI を呼べなかったため中断（費用なし）：#{e.class}")
+      return suspend(run, attempt, "ai_unavailable")
     rescue StandardError => e
       raise unless billable?
       Rails.logger.warn("[time_slot] AI の呼び出しが失敗したため中断：#{e.class}")

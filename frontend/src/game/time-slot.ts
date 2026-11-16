@@ -35,6 +35,7 @@ export function outcomeNote(error: string | null): { adopt: boolean; text: strin
     case "finished": return { adopt: true, text: "この街の時間帯は、もう終わっています。" };
     case "budget": return { adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" };
     case "unknown_result": return { adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" };
+    case "ai_unavailable": return { adopt: true, text: "AI に問い合わせられなかったため止めました。費用はかかっていません。もう一度押すと、やり直します。" };
     case "running": return { adopt: false, text: "この時間帯はいま進めている途中です。少し待ってから、もう一度押してください。" };
     default: return { adopt: false, text: "途中で街の状態が変わったため、反映しませんでした。もう一度押してください。" };
   }
