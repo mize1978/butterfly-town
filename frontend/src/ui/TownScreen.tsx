@@ -20,7 +20,7 @@ import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
-import { aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
+import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
 
 // 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
 type SlotView = { sending: boolean; error: string | null; note: string | null; last: TimeSlot | null };
@@ -69,6 +69,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const advancer = useMemo(() => new SlotAdvancer(), []);
   const [slot, setSlot] = useState<SlotView>(SLOT_IDLE);
   const [stop, setStop] = useState<BudgetStop | null>(null); // 予算不足で止めたときの中断の案内（S22 の最小版）
+  const [budgetPending, setBudgetPending] = useState(false); // 予算不足の案内をまだ見てもらっていない（別の画面を開いていた）
   const slotButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -131,10 +132,13 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const reply = shopReply(repair);
   const partOpen = overlay ? partOfSpot(overlay as SpotId) : null;
 
-  // 会話は何も重ねていないときだけ開く（メニューから会話へ切り替わらない）。閉じたら、開いたボタンへフォーカスを戻す
+  // 会話は何も重ねていないときだけ開く（メニューから会話へ切り替わらない）。閉じたら、開いたボタンへフォーカスを戻す。
+  // 予算不足の案内を保留していたら、閉じたあとにそれを出す（フォーカスは案内の「街に戻る」へ）
   const close = (back: RefObject<HTMLButtonElement | null>) => {
-    setOverlay(null);
-    requestAnimationFrame(() => back.current?.focus());
+    const next = afterClose(overlay, budgetPending);
+    if (overlay === "budget") setBudgetPending(false);
+    setOverlay(next);
+    if (!next) requestAnimationFrame(() => back.current?.focus());
   };
 
   // 時間帯を進める：いまの時間帯を Rails で確定し、次の時間帯の状態とその時間帯の出来事を出す。
@@ -144,6 +148,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const advance = async () => {
     if (!playthrough || finished) return;
     setSlot((v) => ({ ...v, sending: true, error: null, note: null }));
+    setBudgetPending(false);
     try {
       const r = await advancer.advance(playthrough.timeIndex);
       if (r.ok) {
@@ -153,8 +158,9 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
         const n = outcomeNote(r.error);
         if (n.adopt) onPlaythroughChange(r.state);
         setSlot((v) => ({ ...v, sending: false, note: n.text }));
-        // 予算不足：時間帯は確定していない。中断の案内を街の上に重ねて出す
-        if (r.error === "budget") { setStop(budgetStop(r.state, r.resumeAt)); setOverlay((o) => o ?? "budget"); }
+        // 予算不足：時間帯は確定していない。中断の案内を街の上に重ねて出す。
+        // 待つ間にメニュー・会話などを開いていたら、それは閉じずに案内を保留し、閉じたあとに出す
+        if (r.error === "budget") { setStop(budgetStop(r.state, r.resumeAt)); setBudgetPending(true); setOverlay((o) => o ?? "budget"); }
       }
     } catch (e) {
       setSlot((v) => ({ ...v, sending: false, error: (e as Error).message }));

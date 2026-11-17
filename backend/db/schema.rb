@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -174,7 +174,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_000003) do
     t.index ["playthrough_id"], name: "index_time_slot_runs_one_running", unique: true, where: "((status)::text = 'running'::text)"
     t.check_constraint "attempt >= 1", name: "time_slot_runs_attempt"
     t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'confirmed'::character varying, 'suspended'::character varying, 'failed'::character varying]::text[])", name: "time_slot_runs_status"
-    t.check_constraint "suspend_reason IS NULL OR (suspend_reason::text = ANY (ARRAY['budget'::character varying, 'network'::character varying, 'unknown_result'::character varying, 'version_mismatch'::character varying]::text[]))", name: "time_slot_runs_suspend_reason"
+    t.check_constraint "suspend_reason IS NULL OR (suspend_reason::text = ANY (ARRAY['budget'::character varying, 'network'::character varying, 'unknown_result'::character varying, 'version_mismatch'::character varying, 'ai_unavailable'::character varying]::text[]))", name: "time_slot_runs_suspend_reason"
     t.check_constraint "time_index >= 0 AND time_index <= 14", name: "time_slot_runs_time_index"
   end
 

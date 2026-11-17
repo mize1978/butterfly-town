@@ -20,6 +20,7 @@ class AiBudget
   end
 
   class PromptTooLong < StandardError; end
+  class UnknownModel < ArgumentError; end
   # 呼んだ側が「課金されていない」と分かっている失敗（API が受け付けなかった など）。予約を外す
   class NotBilled < StandardError; end
 
@@ -119,7 +120,7 @@ class AiBudget
   def config_value(key) = @config.fetch(key)
 
   def prices(model)
-    p = @config.fetch("models").fetch(model) { raise ArgumentError, "単価が分からないモデル：#{model}" }
+    p = @config.fetch("models").fetch(model) { raise UnknownModel, "単価が分からないモデル：#{model}" }
     p.to_h { |k, v| [ k.to_sym, Rational(v.to_s) ] }
   end
 

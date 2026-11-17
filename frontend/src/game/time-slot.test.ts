@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PlaythroughState } from "../api/playthrough";
 import type { TimeSlotResult } from "../api/time-slot";
 import { PlaythroughError } from "../api/playthrough";
-import { aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "./time-slot";
+import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "./time-slot";
 
 const state = (timeIndex: number, status = "in_progress"): PlaythroughState => ({
   status, timeIndex, timeSlots: 15, festivalProgress: 0, interventionsLeft: 3, residents: []
@@ -40,10 +40,23 @@ describe("409 の理由の案内", () => {
     expect(outcomeNote("version_mismatch")).toMatchObject({ adopt: false });
     expect(outcomeNote("budget")).toEqual({ adopt: true, text: "AI の予算が足りないため、この時間帯は止めています。" });
     expect(outcomeNote("unknown_result")).toEqual({ adopt: true, text: "AI の応答を確かめられなかったため止めました。自動ではやり直しません。" });
+    // #30：AI を呼ぶ前に止まった・API が受け付けなかった。押し直してよいと伝える。
+    // 同じ時間帯で先に費用のかかった呼び出し（同じ試行の別の住民・前の試行）があり得るので、費用の話はしない
+    expect(outcomeNote("ai_unavailable")).toEqual({ adopt: true, text: "AI に問い合わせられなかったため止めました。もう一度押すと、やり直します。" });
+    expect(outcomeNote("ai_unavailable").text).not.toContain("費用");
   });
 });
 
 describe("予算不足の中断（S22 の最小版）", () => {
+  // 送っている間にメニューや会話を開いていると、予算不足の案内は重ねずに保留する（#30 のコメント2つ目）
+  it("保留していた予算不足の案内は、メニュー・会話などを閉じたあとに出す", () => {
+    for (const closing of ["menu", "talk", "shop", "bench", "part-1"]) expect(afterClose(closing, true)).toBe("budget");
+    expect(afterClose("menu", false)).toBeNull();
+  });
+  it("中断の案内そのものを閉じたら、もう出さない", () => {
+    expect(afterClose("budget", true)).toBeNull();
+  });
+
   it("理由・確定していない時間帯・確定済みの進み具合・保存・再開の時期（日本時間）を出す", () => {
     expect(budgetStop(state(4), "2026-12-01T00:00:00+09:00")).toEqual({
       reason: "今月の AI 予算の上限に近づいたため、新しい AI の呼び出しを止めています。",
