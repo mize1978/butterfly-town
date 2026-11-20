@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_21_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -161,6 +161,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.check_constraint "key::text = ANY (ARRAY['a'::character varying, 'b'::character varying, 'c'::character varying]::text[])", name: "residents_key_in_catalog"
   end
 
+  create_table "sessions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
   create_table "time_slot_runs", force: :cascade do |t|
     t.bigint "playthrough_id", null: false
     t.integer "time_index", null: false
@@ -176,6 +185,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'confirmed'::character varying, 'suspended'::character varying, 'failed'::character varying]::text[])", name: "time_slot_runs_status"
     t.check_constraint "suspend_reason IS NULL OR (suspend_reason::text = ANY (ARRAY['budget'::character varying, 'network'::character varying, 'unknown_result'::character varying, 'version_mismatch'::character varying, 'ai_unavailable'::character varying]::text[]))", name: "time_slot_runs_suspend_reason"
     t.check_constraint "time_index >= 0 AND time_index <= 14", name: "time_slot_runs_time_index"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
   end
 
   create_table "world_events", force: :cascade do |t|
@@ -200,13 +217,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
   add_foreign_key "ai_calls", "guests"
   add_foreign_key "ai_calls", "playthroughs"
   add_foreign_key "ai_calls", "time_slot_runs"
+  add_foreign_key "ai_calls", "users"
   add_foreign_key "conversation_messages", "ai_calls"
   add_foreign_key "conversation_messages", "playthroughs"
   add_foreign_key "memories", "residents"
   add_foreign_key "memories", "world_events", column: "source_event_id"
   add_foreign_key "playthroughs", "guests"
+  add_foreign_key "playthroughs", "users"
   add_foreign_key "relationships", "playthroughs"
   add_foreign_key "residents", "playthroughs"
+  add_foreign_key "sessions", "users"
   add_foreign_key "time_slot_runs", "playthroughs"
   add_foreign_key "world_events", "playthroughs"
   add_foreign_key "world_events", "world_events", column: "cause_id"

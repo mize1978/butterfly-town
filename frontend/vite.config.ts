@@ -11,7 +11,9 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4200,
     strictPort: true,
-    proxy: { "/api": process.env.API_ORIGIN ?? "http://127.0.0.1:3100" }
+    // Host は書き換えない（changeOrigin: false）。Rails は Sec-Fetch-Site の無い接続（LAN の http など）では、
+    // Origin と自分の URL（Host から作る）を比べて他サイトからの登録・ログインを拒否するため（#35）
+    proxy: { "/api": { target: process.env.API_ORIGIN ?? "http://127.0.0.1:3100", changeOrigin: false } }
   },
   test: {
     include: ["src/**/*.test.ts"], environment: "node",

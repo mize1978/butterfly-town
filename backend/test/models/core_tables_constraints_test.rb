@@ -50,11 +50,20 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
   # --- 進行中の街は、同じユーザー・同じミッションで1つだけ ---
 
   test "同じユーザーの進行中の街は1つだけ。保管した街は何個あってもよい" do
-    Playthrough.insert!({ mission_key: "festival", user_id: 1, status: "in_progress" })
+    user_id = users(:one).id
+    Playthrough.insert!({ mission_key: "festival", user_id: user_id, status: "in_progress" })
     assert_rejected(ActiveRecord::RecordNotUnique) do
-      Playthrough.insert!({ mission_key: "festival", user_id: 1, status: "in_progress" })
+      Playthrough.insert!({ mission_key: "festival", user_id: user_id, status: "in_progress" })
     end
-    2.times { Playthrough.insert!({ mission_key: "festival", user_id: 1, status: "shelved" }) }
+    2.times { Playthrough.insert!({ mission_key: "festival", user_id: user_id, status: "shelved" }) }
+  end
+
+  test "街と AI の呼び出しの user_id は、存在するユーザーだけ（#16 で外部キーを足した）" do
+    missing = User.maximum(:id).to_i + 1
+    assert_rejected(ActiveRecord::InvalidForeignKey) do
+      Playthrough.insert!({ mission_key: "festival", user_id: missing, status: "in_progress" })
+    end
+    assert ActiveRecord::Base.connection.foreign_key_exists?(:ai_calls, :users)
   end
 
   test "同じゲストの進行中の街も1つだけ（#7：開始が同時に届いても2つ作らない）" do

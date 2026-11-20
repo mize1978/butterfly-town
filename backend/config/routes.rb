@@ -5,6 +5,8 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resource :town, only: :show
+      resource :session, only: %i[show create destroy] # ログイン・ログアウト（#16）
+      resource :registration, only: :create # 登録（#16）
       resource :playthrough, only: %i[show create] do
         resources :time_slots, only: :create
       end

@@ -2,22 +2,63 @@
 // 街（playthrough）は Rails が Cookie でゲストを見分けて持つ（#7）。
 //   開いたとき（再読み込みを含む）：GET で進行中の街を確かめ、あればその状態で街へ戻す。無ければトップ
 //   「ゲストで遊ぶ」：POST で街を始める（同じブラウザに進行中の街があれば、作り直さずに続きが返る）
-// 認証（S02・S03）・保存（S14・S15）はまだ作っていないので、押せないボタンと理由だけを示す
-import { useCallback, useEffect, useState } from "react";
+// 登録（S02）・ログイン（S03）・ログアウトは #16。ログインはゲストの街とは別の Cookie で、街の保存・引継ぎ（#40・#41）はまだ無い。
+// 保存（S14・S15）はまだ作っていないので、押せないボタンと理由だけを示す
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchCurrentUser, logout, type User } from "../api/auth";
 import { fetchPlaythrough, startPlaythrough, type PlaythroughState } from "../api/playthrough";
+import { AccountCheck } from "./account-check";
+import { AuthScreen } from "./AuthScreen";
+import { noticeList, setNotice as withNotice, type Notices, type NoticeSource } from "./notices";
 import { DressScreen } from "./DressScreen";
 import { Frame } from "./Frame";
 import { HowToScreen } from "./HowToScreen";
 import { TitleScreen } from "./TitleScreen";
 import { TownScreen } from "./TownScreen";
 
-export type Screen = "checking" | "title" | "howto" | "dress" | "town";
+export type Screen = "checking" | "title" | "howto" | "dress" | "town" | "register" | "login";
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("checking");
   const [playthrough, setPlaythrough] = useState<PlaythroughState | null>(null);
-  const [notice, setNotice] = useState<string | null>(null); // トップに出す、通信の失敗などの案内
+  const [notices, setNotices] = useState<Notices>({}); // トップに出す、通信の失敗などの案内（街の確認・ログインの確認ごと）
+  const setNotice = useCallback((source: NoticeSource, text: string | null) => setNotices((n) => withNotice(n, source, text)), []);
   const [starting, setStarting] = useState(false);
+  const [user, setUser] = useState<User | null>(null); // ログイン中のユーザー（していなければ null）
+  const [leaving, setLeaving] = useState(false); // ログアウトの通信の途中
+  const accountCheck = useRef(new AccountCheck()); // 開いたときの確認より後に、画面からログイン状態を変えたか
+
+  // 開いたとき：ログインしているかを確かめる（確かめられなくても、ゲストでは遊べるので案内だけ出す）
+  useEffect(() => {
+    let alive = true;
+    const token = accountCheck.current.begin();
+    const current = () => alive && accountCheck.current.isCurrent(token); // 返事が来るまでに画面からログイン・ログアウトしていたら使わない
+    fetchCurrentUser()
+      .then((u) => { if (current()) setUser(u); })
+      .catch((e: Error) => { if (current()) setNotice("account", `${e.message}。ゲストでは遊べます。`); });
+    return () => { alive = false; };
+  }, []);
+
+  const signedIn = useCallback((u: User) => {
+    accountCheck.current.changed();
+    setUser(u);
+    setNotice("account", null);
+    setScreen("title");
+  }, []);
+
+  const signOut = useCallback(async () => {
+    setLeaving(true);
+    setNotice("account", null);
+    try {
+      await logout();
+      accountCheck.current.changed();
+      setUser(null);
+    } catch (e) {
+      setNotice("account", `${(e as Error).message}。もう一度お試しください。`);
+    } finally {
+      setLeaving(false);
+    }
+  }, []);
 
   // 開いたとき：進行中の街があれば、その状態で街へ戻す
   useEffect(() => {
@@ -30,7 +71,7 @@ export function App() {
       })
       .catch((e: Error) => {
         if (!alive) return;
-        setNotice(`${e.message}。「ゲストで遊ぶ」を押すと、もう一度つなぎます。`);
+        setNotice("town", `${e.message}。「ゲストで遊ぶ」を押すと、もう一度つなぎます。`);
         setScreen("title");
       });
     return () => { alive = false; };
@@ -38,13 +79,13 @@ export function App() {
 
   const start = useCallback(async () => {
     setStarting(true);
-    setNotice(null);
+    setNotice("town", null);
     try {
       const { state } = await startPlaythrough();
       setPlaythrough(state);
       setScreen("dress");
     } catch (e) {
-      setNotice(`${(e as Error).message}。通信を確かめて、もう一度お試しください。`);
+      setNotice("town", `${(e as Error).message}。通信を確かめて、もう一度お試しください。`);
       setScreen("title");
     } finally {
       setStarting(false);
@@ -54,7 +95,11 @@ export function App() {
   switch (screen) {
     case "checking":
       return <Frame label="読み込み中"><main className="page"><p className="status" role="status">街を確かめています…</p></main></Frame>;
-    case "title": return <TitleScreen onGuest={start} onHowTo={() => setScreen("howto")} starting={starting} notice={notice} />;
+    case "title": return <TitleScreen onGuest={start} onHowTo={() => setScreen("howto")} starting={starting} notices={noticeList(notices)}
+      user={user} onRegister={() => setScreen("register")} onLogin={() => setScreen("login")} onLogout={signOut} leaving={leaving} />;
+    case "register":
+    case "login":
+      return <AuthScreen key={screen} mode={screen} onDone={signedIn} onSwitch={setScreen} onBack={() => setScreen("title")} />;
     case "howto": return <HowToScreen onStart={start} onBack={() => setScreen("title")} starting={starting} />;
     case "dress": return <DressScreen onEnter={() => setScreen("town")} onBack={() => setScreen("title")} />;
     case "town": return <TownScreen playthrough={playthrough} onPlaythroughChange={setPlaythrough} onExitToTitle={() => setScreen("title")} />;

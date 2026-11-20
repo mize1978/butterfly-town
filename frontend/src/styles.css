@@ -54,6 +54,21 @@ p { margin: 0; }
 .locked .btn { flex: 1 1 0; min-width: max-content; }
 .locked-note { color: var(--muted); font-size: 13px; }
 .title-card .locked-block { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.title-account { display: grid; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.title-card .title-account .locked-block { margin: 0; padding: 0; border: 0; } /* 低い画面の .title-card .locked-block の指定より優先する */
+.title-signed-in { margin: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.title-signed-in .email { color: var(--ink); font-weight: 700; }
+/* S02 登録・S03 ログイン（#16） */
+.auth-page { max-width: 480px; }
+.auth-form { display: grid; gap: 16px; }
+.auth-field { display: grid; gap: 6px; }
+.auth-field label { font-weight: 700; font-size: 15px; }
+.auth-field input { font: inherit; font-size: 16px; min-height: 46px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+.auth-field input:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.auth-field input[aria-invalid="true"] { border-color: var(--clay); }
+.auth-hint { margin: 0; font-size: 13px; color: var(--muted); }
+.auth-error, .auth-error p { margin: 0; font-size: 14px; color: var(--clay); }
+.auth-error.form { padding: 10px 12px; border: 1px solid var(--clay); border-radius: 8px; background: #fff5f1; }
 
 /* S25 遊び方 */
 .howto { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0; line-height: 1.6; }
