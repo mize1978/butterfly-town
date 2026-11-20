@@ -53,6 +53,13 @@ class Api::V1::AuthForgeryTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "Sec-Fetch-Site を付けない接続（LAN の http など安全でない接続）でも、Origin が同じなら登録・ログインできる" do
+    post api_v1_registration_path, params: SIGN_UP, headers: { "Origin" => "http://www.example.com" }, as: :json
+    assert_response :created
+    post api_v1_session_path, params: CREDENTIALS, headers: { "Origin" => "http://www.example.com" }, as: :json
+    assert_response :ok
+  end
+
   test "他サイトからのログアウトは拒否し、ログインしたままにする" do
     post api_v1_session_path, params: CREDENTIALS, headers: SAME_ORIGIN, as: :json
     assert_no_difference -> { Session.count } do
