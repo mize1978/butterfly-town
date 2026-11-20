@@ -45,7 +45,7 @@ export function TownMenu({ onClose, onExitToTitle }: { onClose: () => void; onEx
           <>
             <p className="lead-s">この試作版では、まだ保存されません</p>
             <p>ページを閉じたり再読み込みしたりすると、最初からになります。</p>
-            <Locked labels={["登録して保存へ", "ログインして保存へ"]} note="試作版：登録・ログインは準備中です" />
+            <Locked labels={["登録して保存へ", "ログインして保存へ"]} note="試作版：街の保存は準備中です（登録・ログインはトップからできますが、街は保存されません）" />
             <button type="button" className="btn primary wide" onClick={onClose}>今は登録せず、街へ戻る</button>
             {back}
           </>

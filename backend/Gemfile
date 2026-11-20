@@ -5,6 +5,8 @@ gem "pg", "1.7.0"
 gem "puma", "8.0.2"
 # 実LLM（#30）。Anthropic 公式 Ruby SDK。技術試作（#5）で使った版に固定
 gem "anthropic", "2.3.0"
+# 登録・ログインのパスワードのハッシュ（has_secure_password・#16）
+gem "bcrypt", "3.1.22"
 gem "minitest", "5.27.0", group: :test
 
 # 品質の確認（CI で実行する）。コードの書き方（RuboCop）・脆弱性の静的検査（Brakeman）・テストのカバレッジ（SimpleCov）

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_21_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -55,13 +55,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.index ["request_id"], name: "index_ai_calls_on_request_id", unique: true
     t.index ["time_slot_run_id"], name: "index_ai_calls_on_time_slot_run_id"
     t.index ["user_id"], name: "index_ai_calls_on_user_id"
-    t.check_constraint "(status::text <> ALL (ARRAY['succeeded'::character varying, 'unknown'::character varying]::text[])) OR actual_cost_micro_yen IS NOT NULL", name: "ai_calls_settled_cost"
-    t.check_constraint "applied IS NULL OR (applied::text = ANY (ARRAY['pending'::character varying, 'applied'::character varying, 'discarded'::character varying]::text[]))", name: "ai_calls_applied"
+    t.check_constraint "(status::text <> ALL (ARRAY['succeeded'::character varying::text, 'unknown'::character varying::text])) OR actual_cost_micro_yen IS NOT NULL", name: "ai_calls_settled_cost"
+    t.check_constraint "applied IS NULL OR (applied::text = ANY (ARRAY['pending'::character varying::text, 'applied'::character varying::text, 'discarded'::character varying::text]))", name: "ai_calls_applied"
     t.check_constraint "input_tokens_counted >= 0 AND max_output_tokens > 0", name: "ai_calls_tokens"
-    t.check_constraint "purpose::text = ANY (ARRAY['decision'::character varying, 'conversation'::character varying, 'summary'::character varying, 'dev'::character varying]::text[])", name: "ai_calls_purpose"
+    t.check_constraint "purpose::text = ANY (ARRAY['decision'::character varying::text, 'conversation'::character varying::text, 'summary'::character varying::text, 'dev'::character varying::text])", name: "ai_calls_purpose"
     t.check_constraint "reserved_cost_micro_yen >= 0 AND (actual_cost_micro_yen IS NULL OR actual_cost_micro_yen >= 0)", name: "ai_calls_costs"
     t.check_constraint "status::text <> 'unknown'::text OR actual_cost_micro_yen = reserved_cost_micro_yen", name: "ai_calls_unknown_full"
-    t.check_constraint "status::text = ANY (ARRAY['reserved'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'unknown'::character varying]::text[])", name: "ai_calls_status"
+    t.check_constraint "status::text = ANY (ARRAY['reserved'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text, 'unknown'::character varying::text])", name: "ai_calls_status"
   end
 
   create_table "conversation_messages", force: :cascade do |t|
@@ -100,7 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.index ["resident_id", "fact_key"], name: "index_memories_on_resident_id_and_fact_key", unique: true
     t.index ["resident_id"], name: "index_memories_on_resident_id"
     t.index ["source_event_id"], name: "index_memories_on_source_event_id"
-    t.check_constraint "source::text = ANY (ARRAY['witnessed'::character varying, 'told'::character varying, 'initial'::character varying]::text[])", name: "memories_source"
+    t.check_constraint "source::text = ANY (ARRAY['witnessed'::character varying::text, 'told'::character varying::text, 'initial'::character varying::text])", name: "memories_source"
   end
 
   create_table "playthroughs", force: :cascade do |t|
@@ -128,9 +128,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.index ["user_id"], name: "index_playthroughs_on_user_id"
     t.check_constraint "(user_id IS NULL) <> (guest_id IS NULL)", name: "playthroughs_one_owner"
     t.check_constraint "interventions_used >= 0 AND interventions_used <= 3", name: "playthroughs_interventions_used"
-    t.check_constraint "result IS NULL OR (result::text = ANY (ARRAY['success'::character varying, 'failure'::character varying]::text[]))", name: "playthroughs_result"
+    t.check_constraint "result IS NULL OR (result::text = ANY (ARRAY['success'::character varying::text, 'failure'::character varying::text]))", name: "playthroughs_result"
     t.check_constraint "state_version >= 0", name: "playthroughs_state_version"
-    t.check_constraint "status::text = ANY (ARRAY['in_progress'::character varying, 'shelved'::character varying, 'finished'::character varying, 'abandoned'::character varying]::text[])", name: "playthroughs_status"
+    t.check_constraint "status::text = ANY (ARRAY['in_progress'::character varying::text, 'shelved'::character varying::text, 'finished'::character varying::text, 'abandoned'::character varying::text])", name: "playthroughs_status"
     t.check_constraint "time_index >= 0 AND time_index <= 14", name: "playthroughs_time_index"
   end
 
@@ -158,7 +158,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.datetime "updated_at", null: false
     t.index ["playthrough_id", "key"], name: "index_residents_on_playthrough_id_and_key", unique: true
     t.index ["playthrough_id"], name: "index_residents_on_playthrough_id"
-    t.check_constraint "key::text = ANY (ARRAY['a'::character varying, 'b'::character varying, 'c'::character varying]::text[])", name: "residents_key_in_catalog"
+    t.check_constraint "key::text = ANY (ARRAY['a'::character varying::text, 'b'::character varying::text, 'c'::character varying::text])", name: "residents_key_in_catalog"
+  end
+
+  create_table "sessions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
   create_table "time_slot_runs", force: :cascade do |t|
@@ -173,9 +182,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
     t.index ["playthrough_id", "time_index"], name: "index_time_slot_runs_on_playthrough_id_and_time_index", unique: true
     t.index ["playthrough_id"], name: "index_time_slot_runs_one_running", unique: true, where: "((status)::text = 'running'::text)"
     t.check_constraint "attempt >= 1", name: "time_slot_runs_attempt"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'confirmed'::character varying, 'suspended'::character varying, 'failed'::character varying]::text[])", name: "time_slot_runs_status"
-    t.check_constraint "suspend_reason IS NULL OR (suspend_reason::text = ANY (ARRAY['budget'::character varying, 'network'::character varying, 'unknown_result'::character varying, 'version_mismatch'::character varying, 'ai_unavailable'::character varying]::text[]))", name: "time_slot_runs_suspend_reason"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'confirmed'::character varying::text, 'suspended'::character varying::text, 'failed'::character varying::text])", name: "time_slot_runs_status"
+    t.check_constraint "suspend_reason IS NULL OR (suspend_reason::text = ANY (ARRAY['budget'::character varying::text, 'network'::character varying::text, 'unknown_result'::character varying::text, 'version_mismatch'::character varying::text, 'ai_unavailable'::character varying::text]))", name: "time_slot_runs_suspend_reason"
     t.check_constraint "time_index >= 0 AND time_index <= 14", name: "time_slot_runs_time_index"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
   end
 
   create_table "world_events", force: :cascade do |t|
@@ -200,13 +217,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_000001) do
   add_foreign_key "ai_calls", "guests"
   add_foreign_key "ai_calls", "playthroughs"
   add_foreign_key "ai_calls", "time_slot_runs"
+  add_foreign_key "ai_calls", "users"
   add_foreign_key "conversation_messages", "ai_calls"
   add_foreign_key "conversation_messages", "playthroughs"
   add_foreign_key "memories", "residents"
   add_foreign_key "memories", "world_events", column: "source_event_id"
   add_foreign_key "playthroughs", "guests"
+  add_foreign_key "playthroughs", "users"
   add_foreign_key "relationships", "playthroughs"
   add_foreign_key "residents", "playthroughs"
+  add_foreign_key "sessions", "users"
   add_foreign_key "time_slot_runs", "playthroughs"
   add_foreign_key "world_events", "playthroughs"
   add_foreign_key "world_events", "world_events", column: "cause_id"

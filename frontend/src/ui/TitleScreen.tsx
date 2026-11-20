@@ -1,12 +1,17 @@
 // S01 トップ。街の絵を大きく敷き、タイトルと「ゲストで遊ぶ」を中央にまとめる。
 // 背景の川だけ、ゆったり流れて見せる（右下のボタンでオン・オフ。オフでは元の静止画）。
-// 試作版で遊べるのはゲストだけ。登録・ログイン・つづきからは押せない状態で並べ、理由は1行にまとめる
+// 登録・ログイン（#16）はここから。ログイン中は、メールアドレスとログアウトを出す。
+// 街の保存（つづきから）はまだ無いので押せない状態で並べ、理由は1行にまとめる。ログインしていても、街はゲストの街のまま遊ぶ
 import { useCallback, useState } from "react";
+import type { User } from "../api/auth";
 import { initialWaterOn, saveWaterOn, TitleWater } from "../title/TitleWater";
 import { Locked } from "./Frame";
 
-export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null }: {
+export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null, user = null, onRegister, onLogin, onLogout, leaving = false }: {
   onGuest: () => void; onHowTo: () => void;
+  user?: User | null; // ログイン中のユーザー
+  onRegister?: () => void; onLogin?: () => void; onLogout?: () => void;
+  leaving?: boolean; // ログアウトの通信の途中
   starting?: boolean; // 街を始める通信の途中（二度押しさせない）
   notice?: string | null; // 通信の失敗などの案内
 }) {
@@ -27,7 +32,20 @@ export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null 
         {notice && <p className="status error" role="alert">{notice}</p>}
         <button type="button" className="btn primary start" onClick={onGuest} disabled={starting} autoFocus>{starting ? "街を準備しています…" : "ゲストで遊ぶ →"}</button>
         <button type="button" className="btn ghost" onClick={onHowTo}>遊び方</button>
-        <Locked labels={["登録する", "ログイン", "つづきから"]} note="試作版：ゲストプレイのみ利用できます" />
+        <div className="title-account">
+          {user ? (
+            <>
+              <p className="title-signed-in">ログイン中：<span className="email">{user.email}</span></p>
+              <button type="button" className="btn small" onClick={onLogout} disabled={leaving}>{leaving ? "ログアウトしています…" : "ログアウト"}</button>
+            </>
+          ) : (
+            <div className="locked">
+              <button type="button" className="btn small" onClick={onRegister}>登録する</button>
+              <button type="button" className="btn small" onClick={onLogin}>ログイン</button>
+            </div>
+          )}
+          <Locked labels={["つづきから"]} note="試作版：街の保存はまだできません（ログインしても、街はゲストと同じく保存されません）" />
+        </div>
       </main>
       {unavailable
         ? <button type="button" className="btn small water-toggle" disabled title="この環境では水の動きを表示できないため、静止画で表示しています">水の動き：利用できません</button>
