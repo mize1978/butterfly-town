@@ -8,7 +8,9 @@ module Api
       include Authentication
 
       before_action :reject_cross_site_request, only: %i[create destroy]
-      rate_limit to: 10, within: 3.minutes, only: :create, with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
+      before_action :log_client_ip_route, only: :create
+      rate_limit to: 10, within: 3.minutes, only: :create, by: -> { client_ip },
+                 with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
 
       def show
         render json: user_json(resume_session&.user)

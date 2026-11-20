@@ -76,5 +76,37 @@ module Authentication
     origin.blank? || origin == request.base_url
   end
 
+  # 回数制限で数えるアクセス元（#35）。接続元（REMOTE_ADDR）が信頼できる中継（Render の振り分け・Cloudflare）のときだけ、
+  # X-Forwarded-For から利用者の IP を取る（request.remote_ip）。それ以外の接続は X-Forwarded-For を使わず、接続元そのもので数える。
+  # Rails の remote_ip は接続元が信頼できない場合も X-Forwarded-For を先に見るため、Cloudflare を通らずに届いた接続が
+  # X-Forwarded-For を書き換えて数え方をずらせないようにする
+  def client_ip
+    trusted_proxy?(request.remote_addr) ? request.remote_ip : request.remote_addr
+  end
+
+  def trusted_proxy?(ip)
+    addr = IPAddr.new(ip.to_s)
+    Rails.application.config.action_dispatch.trusted_proxies.any? { |range| range.include?(addr) }
+  rescue IPAddr::InvalidAddressError
+    false
+  end
+
+  # 本番の経路の確認用（#35）。IP そのものは書かず、接続元と X-Forwarded-For の各段が「社内向け・Cloudflare・その他」の
+  # どれかと、どちらで数えたかだけを残す
+  def log_client_ip_route
+    kinds = request.x_forwarded_for.to_s.split(",").map { ip_kind(_1.strip) }
+    Rails.logger.info("[auth] client_ip route: remote_addr=#{ip_kind(request.remote_addr)} forwarded=#{kinds.inspect} " \
+                      "counted_by=#{trusted_proxy?(request.remote_addr) ? 'forwarded' : 'remote_addr'}")
+  end
+
+  def ip_kind(ip)
+    addr = IPAddr.new(ip.to_s)
+    return "private" if ActionDispatch::RemoteIp::TRUSTED_PROXIES.any? { _1.include?(addr) }
+
+    trusted_proxy?(ip) ? "cloudflare" : "other"
+  rescue IPAddr::InvalidAddressError
+    "invalid"
+  end
+
   def user_json(user) = { user: user && { email: user.email } }
 end

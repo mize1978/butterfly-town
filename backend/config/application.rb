@@ -42,5 +42,11 @@ module Backend
     config.api_only = true
     # ゲストの Cookie（#7）を読み書きするため、API モードでも Cookie だけは使う
     config.middleware.use ActionDispatch::Cookies
+
+    # 信頼できる中継（#35 回数制限のアクセス元）。本番は 利用者 → Cloudflare → Render の振り分け → Rails の順に届くので、
+    # Rails の既定（社内向けの IP。Render の振り分け）に、Cloudflare が公開している範囲（config/cloudflare_ips.yml）を足す。
+    # これで request.remote_ip は、Cloudflare が X-Forwarded-For に書き足した利用者の IP になる
+    cloudflare = YAML.safe_load_file(File.expand_path("cloudflare_ips.yml", __dir__)).values.flatten.map { IPAddr.new(_1) }
+    config.action_dispatch.trusted_proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES + cloudflare
   end
 end
