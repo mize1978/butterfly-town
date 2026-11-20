@@ -51,7 +51,11 @@ export async function fetchCurrentUser(): Promise<User | null> {
 
 export async function register(input: { email: string; password: string; passwordConfirmation: string }): Promise<RegisterResult> {
   const res = await request(REGISTRATION, "POST", { email: input.email, password: input.password, password_confirmation: input.passwordConfirmation });
-  if (res.status === 201) return { ok: true, user: parseUser(await readJson(res))! };
+  if (res.status === 201) {
+    const user = parseUser(await readJson(res));
+    if (!user) throw new AuthError("登録の返事にユーザーがありませんでした");
+    return { ok: true, user };
+  }
   if (res.status === 422) {
     const body = await readJson(res);
     const errors = isObj(body) && isObj(body.errors) ? body.errors : null;

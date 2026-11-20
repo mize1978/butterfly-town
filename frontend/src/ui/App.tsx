@@ -4,9 +4,10 @@
 //   「ゲストで遊ぶ」：POST で街を始める（同じブラウザに進行中の街があれば、作り直さずに続きが返る）
 // 登録（S02）・ログイン（S03）・ログアウトは #16。ログインはゲストの街とは別の Cookie で、街の保存・引継ぎ（#40・#41）はまだ無い。
 // 保存（S14・S15）はまだ作っていないので、押せないボタンと理由だけを示す
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCurrentUser, logout, type User } from "../api/auth";
 import { fetchPlaythrough, startPlaythrough, type PlaythroughState } from "../api/playthrough";
+import { AccountCheck } from "./account-check";
 import { AuthScreen } from "./AuthScreen";
 import { noticeList, setNotice as withNotice, type Notices, type NoticeSource } from "./notices";
 import { DressScreen } from "./DressScreen";
@@ -25,17 +26,21 @@ export function App() {
   const [starting, setStarting] = useState(false);
   const [user, setUser] = useState<User | null>(null); // ログイン中のユーザー（していなければ null）
   const [leaving, setLeaving] = useState(false); // ログアウトの通信の途中
+  const accountCheck = useRef(new AccountCheck()); // 開いたときの確認より後に、画面からログイン状態を変えたか
 
   // 開いたとき：ログインしているかを確かめる（確かめられなくても、ゲストでは遊べるので案内だけ出す）
   useEffect(() => {
     let alive = true;
+    const token = accountCheck.current.begin();
+    const current = () => alive && accountCheck.current.isCurrent(token); // 返事が来るまでに画面からログイン・ログアウトしていたら使わない
     fetchCurrentUser()
-      .then((u) => { if (alive) setUser(u); })
-      .catch((e: Error) => { if (alive) setNotice("account", `${e.message}。ゲストでは遊べます。`); });
+      .then((u) => { if (current()) setUser(u); })
+      .catch((e: Error) => { if (current()) setNotice("account", `${e.message}。ゲストでは遊べます。`); });
     return () => { alive = false; };
   }, []);
 
   const signedIn = useCallback((u: User) => {
+    accountCheck.current.changed();
     setUser(u);
     setNotice("account", null);
     setScreen("title");
@@ -46,6 +51,7 @@ export function App() {
     setNotice("account", null);
     try {
       await logout();
+      accountCheck.current.changed();
       setUser(null);
     } catch (e) {
       setNotice("account", `${(e as Error).message}。もう一度お試しください。`);

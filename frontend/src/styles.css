@@ -55,7 +55,7 @@ p { margin: 0; }
 .locked-note { color: var(--muted); font-size: 13px; }
 .title-card .locked-block { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .title-account { display: grid; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
-.title-account .locked-block { margin: 0; padding: 0; border: 0; }
+.title-card .title-account .locked-block { margin: 0; padding: 0; border: 0; } /* 低い画面の .title-card .locked-block の指定より優先する */
 .title-signed-in { margin: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 .title-signed-in .email { color: var(--ink); font-weight: 700; }
 /* S02 登録・S03 ログイン（#16） */

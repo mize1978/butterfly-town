@@ -10,7 +10,7 @@ module Api
       rate_limit to: 10, within: 3.minutes, only: :create, with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
 
       def create
-        user = User.new(params.permit(:email, :password, :password_confirmation))
+        user = User.new(sign_up_params)
         return render(json: { errors: reasons(user) }, status: :unprocessable_entity) unless user.save
 
         start_new_session_for(user)
@@ -20,6 +20,11 @@ module Api
       end
 
       private
+
+      # 文字列でない値（数値・真偽値・配列・オブジェクト）は、入っていないものとして扱う（500 にせず、入力の誤りとして返す）
+      def sign_up_params
+        %i[email password password_confirmation].index_with { |key| params[key].is_a?(String) ? params[key] : nil }
+      end
 
       def reasons(user) = user.errors.details.transform_values { |list| list.map { _1[:error].to_s }.uniq }
     end
