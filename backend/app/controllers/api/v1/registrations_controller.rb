@@ -21,9 +21,14 @@ module Api
 
       private
 
-      # 文字列でない値（数値・真偽値・配列・オブジェクト）は、入っていないものとして扱う（500 にせず、入力の誤りとして返す）
+      # 文字列でない値（数値・真偽値・配列・オブジェクト）は、空の文字列として扱う（500 にせず、入力の誤りとして返す）。
+      # 送られていない項目だけを nil にする（nil にすると、確認用のパスワードの確かめが飛ばされるため）
       def sign_up_params
-        %i[email password password_confirmation].index_with { |key| params[key].is_a?(String) ? params[key] : nil }
+        %i[email password password_confirmation].index_with do |key|
+          next nil unless params.key?(key)
+
+          params[key].is_a?(String) ? params[key] : ""
+        end
       end
 
       def reasons(user) = user.errors.details.transform_values { |list| list.map { _1[:error].to_s }.uniq }
