@@ -16,7 +16,8 @@ async function request(url: string, method: string, body?: unknown): Promise<Res
   try {
     return await fetch(url, {
       method, credentials: "same-origin",
-      headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
+      // GET 以外は JSON で送る（Rails は他サイトのフォームからの要求を拒否するため、JSON の要求だけを受け付ける）
+      headers: method === "GET" ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
   } catch {

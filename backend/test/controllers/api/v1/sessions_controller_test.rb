@@ -73,21 +73,21 @@ class Api::V1::SessionsControllerTest < ActionDispatch::IntegrationTest
   test "ログアウトすると、セッションを DB から消し、Cookie も消す。もう一度ログアウトしても失敗しない" do
     login
     assert_difference -> { Session.count }, -1 do
-      delete api_v1_session_path
+      delete api_v1_session_path, as: :json
     end
     assert_response :no_content
     assert cookies["session_id"].blank?
     get api_v1_session_path
     assert_equal({ "user" => nil }, body)
 
-    delete api_v1_session_path
+    delete api_v1_session_path, as: :json
     assert_response :no_content
   end
 
   test "ログアウトしても、ほかの端末のセッションは残る" do
     other = users(:one).sessions.create!
     login
-    delete api_v1_session_path
+    delete api_v1_session_path, as: :json
     assert Session.exists?(other.id)
   end
 
@@ -120,7 +120,7 @@ class Api::V1::SessionsControllerTest < ActionDispatch::IntegrationTest
     post api_v1_playthrough_path
     guest_token = cookies["guest_token"]
     login
-    delete api_v1_session_path
+    delete api_v1_session_path, as: :json
     assert_equal guest_token, cookies["guest_token"]
     get api_v1_playthrough_path
     assert_response :ok

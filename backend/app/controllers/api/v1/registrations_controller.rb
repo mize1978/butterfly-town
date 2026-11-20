@@ -6,6 +6,7 @@ module Api
     class RegistrationsController < ApplicationController
       include Authentication
 
+      before_action :reject_cross_site_request, only: :create
       rate_limit to: 10, within: 3.minutes, only: :create, with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
 
       def create

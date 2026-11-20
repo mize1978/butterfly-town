@@ -7,13 +7,13 @@ import type { User } from "../api/auth";
 import { initialWaterOn, saveWaterOn, TitleWater } from "../title/TitleWater";
 import { Locked } from "./Frame";
 
-export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null, user = null, onRegister, onLogin, onLogout, leaving = false }: {
+export function TitleScreen({ onGuest, onHowTo, starting = false, notices = [], user = null, onRegister, onLogin, onLogout, leaving = false }: {
   onGuest: () => void; onHowTo: () => void;
   user?: User | null; // ログイン中のユーザー
   onRegister?: () => void; onLogin?: () => void; onLogout?: () => void;
   leaving?: boolean; // ログアウトの通信の途中
   starting?: boolean; // 街を始める通信の途中（二度押しさせない）
-  notice?: string | null; // 通信の失敗などの案内
+  notices?: string[]; // 通信の失敗などの案内（街の確認・ログインの確認ごとに1つ）
 }) {
   const [water, setWater] = useState(initialWaterOn);
   const [unavailable, setUnavailable] = useState(false); // 描画できない環境では静止画で表示していることを示す
@@ -29,7 +29,7 @@ export function TitleScreen({ onGuest, onHowTo, starting = false, notice = null,
         <p className="title-brand">Butterfly Town</p>
         <h1 className="title-lead">小さな一手が、<wbr />街の未来を変える。</h1>
         <p className="title-sub">記憶と意思を持つ住民たちと、5日間の街祭りへ。</p>
-        {notice && <p className="status error" role="alert">{notice}</p>}
+        {notices.map((n) => <p key={n} className="status error" role="alert">{n}</p>)}
         <button type="button" className="btn primary start" onClick={onGuest} disabled={starting} autoFocus>{starting ? "街を準備しています…" : "ゲストで遊ぶ →"}</button>
         <button type="button" className="btn ghost" onClick={onHowTo}>遊び方</button>
         <div className="title-account">
