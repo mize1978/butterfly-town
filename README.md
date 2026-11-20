@@ -581,6 +581,7 @@ PRとmainへのpushのたびに、GitHub Actions（`.github/workflows/ci.yml`）
 - 1つのDockerイメージで、Rails APIとビルド済みの画面を配ります（`Dockerfile`、`render.yaml`）。
 - 起動時に `db:prepare` が成功してから、Railsを起動します。
 - 秘密の値（`DATABASE_URL`・`SECRET_KEY_BASE`）は、Renderの環境変数だけに置きます。リポジトリには入れません。
+- リクエストは「利用者 → Cloudflare → Renderの振り分け → Rails」の順に届きます。登録・ログインの回数制限は、Cloudflareが `X-Forwarded-For` に書き足した利用者のIPごとに数えます。そのため、Cloudflareが公開しているIPの範囲を「信頼できる中継」にしています（`backend/config/cloudflare_ips.yml`）。範囲が変わったら、[ips-v4](https://www.cloudflare.com/ips-v4)・[ips-v6](https://www.cloudflare.com/ips-v6) と照らし合わせて更新します。Cloudflareを通らずに届いた接続は、`X-Forwarded-For` を使わず、接続元のIPで数えます。
 
 ### 出し方
 
