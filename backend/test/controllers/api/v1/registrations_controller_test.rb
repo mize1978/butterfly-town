@@ -47,6 +47,15 @@ class Api::V1::RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_includes body.dig("errors", "password"), "blank"
   end
 
+  test "ログイン中の端末で登録すると、その端末の前のセッションだけを無効にする" do
+    post api_v1_session_path, params: { email: "one@example.com", password: "password123" }, as: :json
+    before = Session.last
+    register
+    assert_response :created
+    refute Session.exists?(before.id)
+    assert_equal "new@example.com", Session.last.user.email
+  end
+
   test "登録してもゲストの街（Cookie）はそのまま残る" do
     post api_v1_playthrough_path
     guest_token = cookies["guest_token"]

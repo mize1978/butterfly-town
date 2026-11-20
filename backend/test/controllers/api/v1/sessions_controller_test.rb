@@ -91,6 +91,31 @@ class Api::V1::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert Session.exists?(other.id)
   end
 
+  test "ログイン中の端末で別の人がログインすると、その端末の前のセッションだけを無効にする（ほかの端末は残す）" do
+    other_device = users(:one).sessions.create!
+    login("one@example.com")
+    before = Session.last
+    assert_no_difference -> { Session.count } do
+      login("two@example.com")
+    end
+    assert_response :ok
+    refute Session.exists?(before.id), "この端末の前のセッションは消える"
+    assert Session.exists?(other_device.id), "ほかの端末のセッションは残る"
+    assert_equal users(:two), Session.last.user
+    get api_v1_session_path
+    assert_equal "two@example.com", body.dig("user", "email")
+  end
+
+  test "ログインに失敗したときは、前のセッションをそのまま残す" do
+    login("one@example.com")
+    before = Session.last
+    login("two@example.com", "wrong-password")
+    assert_response :unauthorized
+    assert Session.exists?(before.id)
+    get api_v1_session_path
+    assert_equal "one@example.com", body.dig("user", "email")
+  end
+
   test "ログアウトしてもゲストの街（Cookie）はそのまま残る" do
     post api_v1_playthrough_path
     guest_token = cookies["guest_token"]

@@ -32,7 +32,7 @@ describe("登録（register）", () => {
     await expect(register({ email: "new@example.com", password: "password123", passwordConfirmation: "password123" }))
       .resolves.toEqual({ ok: true, user: { email: "new@example.com" } });
     expect(f).toHaveBeenCalledWith("/api/v1/registration", expect.objectContaining({
-      method: "POST", credentials: "same-origin",
+      method: "POST", credentials: "same-origin", headers: expect.objectContaining({ "Content-Type": "application/json" }),
       body: JSON.stringify({ email: "new@example.com", password: "password123", password_confirmation: "password123" })
     }));
   });
@@ -69,6 +69,8 @@ describe("ログイン（login）・ログアウト（logout）", () => {
     vi.stubGlobal("fetch", f);
     await expect(logout()).resolves.toBeUndefined();
     expect(f).toHaveBeenCalledWith("/api/v1/session", expect.objectContaining({ method: "DELETE" }));
+    // Rails は JSON で送られた要求だけを受け付ける（他サイトのフォームからの要求を拒否するため）
+    expect((f.mock.calls[0] as unknown as [string, RequestInit])[1].headers).toMatchObject({ "Content-Type": "application/json" });
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
     await expect(logout()).rejects.toThrow(AuthError);
   });
