@@ -40,6 +40,19 @@ class Api::V1::RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ "confirmation" ], body.dig("errors", "password_confirmation")
   end
 
+  test "メールアドレスやパスワードを文字列でなく送ると、500 にせず入力の誤り（422）として返す" do
+    assert_no_difference -> { User.count } do
+      post api_v1_registration_path, params: { email: "n1@example.com", password: 12_345_678, password_confirmation: 12_345_678 }, as: :json
+      assert_response :unprocessable_entity
+      assert_includes body.dig("errors", "password"), "blank"
+      post api_v1_registration_path, params: { email: 123, password: "password123", password_confirmation: "password123" }, as: :json
+      assert_response :unprocessable_entity
+      assert body.dig("errors", "email").present?
+      post api_v1_registration_path, params: { email: { "x" => 1 }, password: [ "a" ] }, as: :json
+      assert_response :unprocessable_entity
+    end
+  end
+
   test "何も入れずに送ると、必須の理由を返す" do
     post api_v1_registration_path, params: {}, as: :json
     assert_response :unprocessable_entity

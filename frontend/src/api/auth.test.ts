@@ -37,6 +37,11 @@ describe("登録（register）", () => {
     }));
   });
 
+  it("登録できた（201）のに返事にユーザーが無いときは、成功にせず失敗にする", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ user: null }, 201)));
+    await expect(register({ email: "new@example.com", password: "password123", passwordConfirmation: "password123" })).rejects.toThrow(AuthError);
+  });
+
   it("入力の問題（422）は、項目ごとの理由として返す", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ errors: { email: ["taken"], password: ["too_short"] } }, 422)));
     await expect(register({ email: "one@example.com", password: "short", passwordConfirmation: "short" }))
