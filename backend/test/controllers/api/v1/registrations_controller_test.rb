@@ -50,6 +50,10 @@ class Api::V1::RegistrationsControllerTest < ActionDispatch::IntegrationTest
       assert body.dig("errors", "email").present?
       post api_v1_registration_path, params: { email: { "x" => 1 }, password: [ "a" ] }, as: :json
       assert_response :unprocessable_entity
+      # 確認用だけを文字列でなく送っても、確かめを飛ばさない（入っていないものとして扱うと、確認なしで登録できてしまう）
+      post api_v1_registration_path, params: { email: "n2@example.com", password: "password123", password_confirmation: 12_345 }, as: :json
+      assert_response :unprocessable_entity
+      assert_equal [ "confirmation" ], body.dig("errors", "password_confirmation")
     end
   end
 
