@@ -57,7 +57,13 @@ module Authentication
   # CORS の許可が要る（このアプリは CORS を許可していない）。さらに、ブラウザが付ける Sec-Fetch-Site が同じオリジン以外を示すか、
   # Sec-Fetch-Site の無い古いブラウザで Origin が別のサイトなら拒否する
   def reject_cross_site_request
-    render json: { error: "cross_site_request" }, status: :forbidden unless same_origin_json_request?
+    return if same_origin_json_request?
+
+    # どのチェックで拒否したかを残す（値はブラウザが付けたヘッダーと、Rails が自分の URL とみなしたものだけ）
+    Rails.logger.warn("[auth] cross_site_request rejected: media_type=#{request.media_type.inspect} " \
+                      "sec_fetch_site=#{request.headers['Sec-Fetch-Site'].inspect} origin=#{request.headers['Origin'].inspect} " \
+                      "base_url=#{request.base_url.inspect}")
+    render json: { error: "cross_site_request" }, status: :forbidden
   end
 
   def same_origin_json_request?
