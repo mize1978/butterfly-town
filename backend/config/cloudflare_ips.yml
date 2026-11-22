@@ -1,6 +1,6 @@
 # Cloudflare が公開している、Cloudflare からオリジンへつなぐときの IP の範囲（#35 回数制限のアクセス元の判定）。
 # 本番は 利用者 → Cloudflare → Render の振り分け → Rails の順に届く（2026-11-21 に DNS・応答のヘッダー・本番のログで確認）。
-# Cloudflare は X-Forwarded-For に訪問者の IP を書き足すので、この範囲を「信頼できる中継」にすると、その手前の訪問者の IP がアクセス元になる。
+# この差分では、経路の診断のログで「Cloudflare の拠点か」を分けるためだけに使う（回数制限の数え方には使わない）。
 # 出どころ：https://www.cloudflare.com/ips-v4 ・ https://www.cloudflare.com/ips-v6 （取得 2026-11-21）。範囲が変わったら更新する
 v4:
   - 173.245.48.0/20

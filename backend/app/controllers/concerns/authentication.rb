@@ -76,36 +76,46 @@ module Authentication
     origin.blank? || origin == request.base_url
   end
 
-  # 回数制限で数えるアクセス元（#35）。接続元（REMOTE_ADDR）が信頼できる中継（Render の振り分け・Cloudflare）のときだけ、
-  # X-Forwarded-For から利用者の IP を取る（request.remote_ip）。それ以外の接続は X-Forwarded-For を使わず、接続元そのもので数える。
-  # Rails の remote_ip は接続元が信頼できない場合も X-Forwarded-For を先に見るため、Cloudflare を通らずに届いた接続が
-  # X-Forwarded-For を書き換えて数え方をずらせないようにする
-  def client_ip
-    trusted_proxy?(request.remote_addr) ? request.remote_ip : request.remote_addr
+  # 本番の経路の診断（#35）。回数制限の数え方は変えず、Rails に直接つながる中継（REMOTE_ADDR）と、転送ヘッダーの各段の
+  # 「種類」と「位置」だけを残す。IP そのもの（一部も）は書かない。経路が確定したら、その経路だけを採用する判定に置き換える
+  #   remote_addr / forwarded … loopback・private（社内向け）・link_local・cgnat（100.64/10）・cloudflare（公開範囲）・other・invalid
+  #   cf_connecting_ip など … 値が X-Forwarded-For の右から何番目（forwarded[-N]）か、接続元（remote_addr）と同じか、どこにも無い（unmatched）か、無い（absent）か
+  #   remote_ip … いまの Rails の既定（request.remote_ip）がどの位置の値を選んだか
+  ROUTE_HEADERS = { cf_connecting_ip: "CF-Connecting-IP", x_real_ip: "X-Real-IP", true_client_ip: "True-Client-IP", client_ip_header: "Client-Ip" }.freeze
+  IP_KINDS = {
+    loopback: %w[127.0.0.0/8 ::1],
+    private: %w[10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7],
+    link_local: %w[169.254.0.0/16 fe80::/10],
+    cgnat: %w[100.64.0.0/10],
+    cloudflare: YAML.safe_load_file(Rails.root.join("config/cloudflare_ips.yml")).values.flatten
+  }.transform_values { |ranges| ranges.map { IPAddr.new(_1) } }.freeze
+
+  def log_request_route
+    forwarded = request.x_forwarded_for.to_s.split(",").map(&:strip)
+    fields = { remote_addr: ip_kind(request.remote_addr), forwarded: forwarded.empty? ? "none" : forwarded.map { ip_kind(_1) }.join(",") }
+    ROUTE_HEADERS.each { |key, name| fields[key] = route_position(request.headers[name], forwarded) }
+    fields[:forwarded_header] = request.headers["Forwarded"].present? ? "present" : "absent"
+    fields[:cf_ray] = request.headers["CF-Ray"].present? ? "present" : "absent"
+    fields[:remote_ip] = route_position(request.remote_ip, forwarded)
+    Rails.logger.info("[auth] request route: #{fields.map { |k, v| "#{k}=#{v}" }.join(' ')}")
+  rescue StandardError => e # 診断の失敗で登録・ログインを止めない
+    Rails.logger.warn("[auth] request route: failed #{e.class}")
   end
 
-  def trusted_proxy?(ip)
-    addr = IPAddr.new(ip.to_s)
-    Rails.application.config.action_dispatch.trusted_proxies.any? { |range| range.include?(addr) }
-  rescue IPAddr::InvalidAddressError
-    false
-  end
+  def route_position(value, forwarded)
+    return "absent" if value.blank?
 
-  # 本番の経路の確認用（#35）。IP そのものは書かず、接続元と X-Forwarded-For の各段が「社内向け・Cloudflare・その他」の
-  # どれかと、どちらで数えたかだけを残す
-  def log_client_ip_route
-    kinds = request.x_forwarded_for.to_s.split(",").map { ip_kind(_1.strip) }
-    Rails.logger.info("[auth] client_ip route: remote_addr=#{ip_kind(request.remote_addr)} forwarded=#{kinds.inspect} " \
-                      "counted_by=#{trusted_proxy?(request.remote_addr) ? 'forwarded' : 'remote_addr'}")
+    value = value.to_s.strip
+    index = forwarded.rindex(value)
+    return "forwarded[-#{forwarded.size - index}]" if index
+    value == request.remote_addr.to_s ? "remote_addr" : "unmatched"
   end
 
   def ip_kind(ip)
     addr = IPAddr.new(ip.to_s)
-    return "private" if ActionDispatch::RemoteIp::TRUSTED_PROXIES.any? { _1.include?(addr) }
-
-    trusted_proxy?(ip) ? "cloudflare" : "other"
+    IP_KINDS.find { |_, ranges| ranges.any? { _1.include?(addr) } }&.first || :other
   rescue IPAddr::InvalidAddressError
-    "invalid"
+    :invalid
   end
 
   def user_json(user) = { user: user && { email: user.email } }
