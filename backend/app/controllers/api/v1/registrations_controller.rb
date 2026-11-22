@@ -8,7 +8,7 @@ module Api
 
       before_action :log_request_route, only: :create
       before_action :reject_cross_site_request, only: :create
-      rate_limit to: 10, within: 3.minutes, only: :create, with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
+      rate_limit to: 10, within: 3.minutes, only: :create, by: -> { client_ip }, with: -> { render json: { error: "rate_limited" }, status: :too_many_requests }
 
       def create
         user = User.new(sign_up_params)

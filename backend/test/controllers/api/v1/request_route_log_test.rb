@@ -1,8 +1,7 @@
 require "test_helper"
-require "minitest/mock"
 
 # #35 本番の経路の診断。Rails に直接つながる中継（REMOTE_ADDR）と、転送ヘッダーの各段が何かを、IP を書かずに残す。
-# 回数制限の数え方はこの差分では変えない（いまの request.remote_ip のまま）
+# 回数制限の数え方は client_ip_rate_limit_test.rb で確かめる
 class Api::V1::RequestRouteLogTest < ActionDispatch::IntegrationTest
   CLIENT = "203.0.113.7" # 利用者
   EDGE = "172.68.1.9"    # Cloudflare の拠点（公開範囲の中）
@@ -21,11 +20,6 @@ class Api::V1::RequestRouteLogTest < ActionDispatch::IntegrationTest
     io.string.lines.grep(/\[auth\] request route:/).first.to_s
   ensure
     Rails.logger = old
-  end
-
-  def with_counting_store
-    memory = ActiveSupport::Cache::MemoryStore.new
-    ActionController::Base.cache_store.stub(:increment, ->(*args, **kw) { memory.increment(*args, **kw) }) { yield }
   end
 
   test "形A（接続元が社内向け・右端が Cloudflare）を、種類と位置だけで記録し、IP は書かない" do
@@ -67,15 +61,5 @@ class Api::V1::RequestRouteLogTest < ActionDispatch::IntegrationTest
   test "登録でも同じ記録を残す" do
     line = route_line { wrong_login(path: api_v1_registration_path, headers: { "X-Forwarded-For" => "#{CLIENT}, #{EDGE}" }) }
     assert_includes line, "remote_addr=private forwarded=other,cloudflare"
-  end
-
-  test "回数制限の数え方は変えない（いまの request.remote_ip＝Cloudflare の拠点ごとのまま）" do
-    with_counting_store do
-      10.times { wrong_login(headers: { "X-Forwarded-For" => "#{CLIENT}, #{EDGE}" }) }
-      wrong_login(headers: { "X-Forwarded-For" => "#{CLIENT}, #{EDGE}" })
-      assert_response :too_many_requests
-      wrong_login(headers: { "X-Forwarded-For" => "#{CLIENT}, #{EDGE2}" })
-      assert_response :unauthorized, "拠点が変わると別に数える（直すのは PR #56）"
-    end
   end
 end

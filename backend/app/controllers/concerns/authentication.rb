@@ -76,8 +76,8 @@ module Authentication
     origin.blank? || origin == request.base_url
   end
 
-  # 本番の経路の診断（#35）。回数制限の数え方は変えず、Rails に直接つながる中継（REMOTE_ADDR）と、転送ヘッダーの各段の
-  # 「種類」と「位置」だけを残す。IP そのもの（一部も）は書かない。経路が確定したら、その経路だけを採用する判定に置き換える
+  # 本番の経路の確認用（#35）。Rails に直接つながる中継（REMOTE_ADDR）と、転送ヘッダーの各段の「種類」と「位置」、
+  # 回数制限をどちらで数えたか（counted_by）だけを残す。IP そのもの（一部も）は書かない
   #   remote_addr / forwarded … loopback・private（社内向け）・link_local・cgnat（100.64/10）・cloudflare（公開範囲）・other・invalid
   #   cf_connecting_ip など … 値が X-Forwarded-For の右から何番目（forwarded[-N]）か、接続元（remote_addr）と同じか、どこにも無い（unmatched）か、無い（absent）か
   #   remote_ip … いまの Rails の既定（request.remote_ip）がどの位置の値を選んだか
@@ -97,9 +97,29 @@ module Authentication
     fields[:forwarded_header] = request.headers["Forwarded"].present? ? "present" : "absent"
     fields[:cf_ray] = request.headers["CF-Ray"].present? ? "present" : "absent"
     fields[:remote_ip] = route_position(request.remote_ip, forwarded)
+    fields[:counted_by] = render_route_client ? "render_route" : "remote_addr"
     Rails.logger.info("[auth] request route: #{fields.map { |k, v| "#{k}=#{v}" }.join(' ')}")
   rescue StandardError => e # 診断の失敗で登録・ログインを止めない
     Rails.logger.warn("[auth] request route: failed #{e.class}")
+  end
+
+  # 回数制限で数えるアクセス元（#35）。本番の経路は #57 の診断ログ（2026-11-22、登録とログインの2件）で確かめた次の形だけ：
+  #   REMOTE_ADDR＝ループバック、X-Forwarded-For の右から「社内向けの中継」「Cloudflare の拠点」「利用者」、
+  #   CF-Connecting-IP＝右から3番目と同じ
+  # この形のときだけ右から3番目（Cloudflare が書き足した利用者）で数える。左に足された値・Forwarded・Client-Ip は見ない。
+  # 形が違えば（経路が変わった・直接届いたなど）転送ヘッダーを使わず、直接の接続元（REMOTE_ADDR）で数える
+  def client_ip
+    render_route_client || request.remote_addr
+  end
+
+  def render_route_client
+    return unless ip_kind(request.remote_addr) == :loopback
+
+    hops = request.x_forwarded_for.to_s.split(",").map(&:strip)
+    return unless hops.size >= 3 && ip_kind(hops[-1]) == :private && ip_kind(hops[-2]) == :cloudflare
+
+    client = hops[-3]
+    client if ip_kind(client) != :invalid && request.headers["CF-Connecting-IP"].to_s.strip == client
   end
 
   def route_position(value, forwarded)
