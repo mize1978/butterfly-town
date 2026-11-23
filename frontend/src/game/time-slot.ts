@@ -29,6 +29,10 @@ export function describeEvent(e: TimeSlotEvent): string {
     case "moved": return `${who(e.actorKey)}が${place(e.moveTo)}へ向かうことにした`;
     case "accepted": return `${who(e.actorKey)}が${who(e.targetKey)}の誘いを受けた`;
     case "declined": return `${who(e.actorKey)}が${who(e.targetKey)}の誘いを断った`;
+    // 特殊介入（#33）。うわさの中身は出さない（相手がもう知っていたかどうかも、文では区別しない）
+    case "rumored": return `${who(e.targetKey)}にうわさを流した`;
+    case "gathering_announced": return `${place(e.place)}で${e.at !== undefined ? slotLabel(e.at) : "次の朝か昼"}に集まりがあると告知した`;
+    case "gathering_held": return `${place(e.place)}で集まりが開かれた（${e.attendees?.length ? `来たのは${e.attendees.map(who).join("・")}` : "誰も来なかった"}）`;
     default: return `${who(e.actorKey)}の出来事（${e.kind}）`;
   }
 }

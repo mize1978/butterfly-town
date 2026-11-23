@@ -38,7 +38,7 @@ class LlmResponderTest < ActiveSupport::TestCase
     "personality" => [ "約束を重視" ], "goals" => [ "祭りを成功させる" ],
     "memories" => [ { "fact_key" => "e1", "content" => "Bは昨年の準備に参加しなかった",
                       "interpretation" => "Bは約束を軽く考えているのかもしれない", "source" => "observation" } ],
-    "invites_to_me" => [], "my_invites" => [], "usual_places" => {}
+    "invites_to_me" => [], "my_invites" => [], "usual_places" => {}, "gatherings" => []
   }.freeze
 
   def reply(**over)
@@ -100,7 +100,7 @@ class LlmResponderTest < ActiveSupport::TestCase
     assert_equal [ "a" ], schema.dig(:properties, :target, :anyOf, 0, :enum)
     assert_includes schema.dig(:properties, :params, :required), "answer"
     assert_equal({ "task" => "setup", "answer" => "accept" }, proposal["params"])
-    assert_equal "v2", LlmResponder.config.fetch("prompt_version")
+    assert_equal "v3", LlmResponder.config.fetch("prompt_version")
   end
 
   test "返答の行動案と使用量を返す。使わない params（null）は外す" do

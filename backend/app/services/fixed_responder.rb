@@ -9,6 +9,7 @@
 #   my_invite：自分が出した誘いの状態 { to:, status: [none, pending, accepted, declined] }（#55）
 #   invite_to_me：自分宛ての未回答の誘いがある（pending）（#55）
 #   accepted_invite / parts：受けた誘いがある・時間帯（morning・noon・night）（#55）
+#   gathering：まだ開かれていない集まりの予定がある（#33）。response の params.to に "$gathering" と書くと、その場所に置き換える
 class FixedResponder
   PATH = Rails.root.join("config/fixed_responses.yml")
 
@@ -19,7 +20,11 @@ class FixedResponder
   def call(context, accepted_invites_to_me: [])
     me = context.fetch("resident_key")
     rule = @rules.find { |r| (r["actor"].nil? || r["actor"] == me) && matches?(r, context, accepted_invites_to_me) }
-    rule.fetch("response").merge("actor" => me, "rule_id" => rule.fetch("id"))
+    response = rule.fetch("response")
+    if response.dig("params", "to") == "$gathering"
+      response = response.merge("params" => response["params"].merge("to" => context.fetch("gatherings").first.fetch("place")))
+    end
+    response.merge("actor" => me, "rule_id" => rule.fetch("id"))
   end
 
   private
@@ -33,7 +38,8 @@ class FixedResponder
       my_invite?(rule["my_invite"], context) &&
       (rule["invite_to_me"].nil? || context.fetch("invites_to_me").any?) &&
       (rule["accepted_invite"].nil? || accepted.any?) &&
-      (rule["parts"].nil? || rule["parts"].include?(context.fetch("part")))
+      (rule["parts"].nil? || rule["parts"].include?(context.fetch("part"))) &&
+      (rule["gathering"].nil? || context.fetch("gatherings").any?)
   end
 
   def my_invite?(condition, context)

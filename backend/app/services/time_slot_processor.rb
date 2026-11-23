@@ -10,7 +10,8 @@
 # 出来事の command_id は「時間帯・住民」で決まるので、同じ時間帯を2回確定しても出来事は増えない。
 # 伝える行動が成立したときだけ、受け手の記憶を作る（#9）。
 # 返事（#55）は accepted / declined の出来事だけを残す（記憶・進み具合・関係値は変えない）。
-# 移動（#55）は出来事と移動の予定（residents.current_plan）を残し、次の朝か昼から反映する
+# 移動（#55）は出来事と移動の予定（residents.current_plan）を残し、次の朝か昼から反映する。
+# 特殊介入の集まり（#33）が開かれる時間帯には、その場所にいた住民を参加者として記録する（行動は決めない）
 #
 # 費用のかかる応答（実LLM。billable? が true のもの）は、呼ぶ前に AiBudget で予約する（#10）。
 # 予算が足りなければ、その時間帯を確定させずに止め（suspended・budget）、再開できる時期を返す。
@@ -82,7 +83,7 @@ class TimeSlotProcessor
     @playthrough.residents.includes(:memories).sort_by(&:key).filter_map do |resident|
       context = ResidentContext.build(resident, @playthrough, locations: locations, invitations: invitations)
       accepted = invitations.accepted_to(resident.key)
-      next unless context["present"].any? || decides_alone?(resident, context, accepted, time_index)
+      next unless context["present"].any? || decides_alone?(resident, context, accepted, time_index) || announced_now?(time_index)
 
       rails_only = { accepted_invites_to_me: accepted.map { { "from" => _1.from, "task" => _1.task } } }
       [ resident, context, respond(context, rails_only, run, attempt, base_version, time_index) ]
@@ -90,11 +91,24 @@ class TimeSlotProcessor
   end
 
   # ひとりでも判断する条件（#55）。与えるのは判断の機会だけで、何をするかは住民が選ぶ
-  #   1. 前の時間帯に、新しく記憶を得た  2. 自分宛てに未回答の誘いがある  3. 受けた誘いがあり、いまが朝か昼
+  #   1. 前の時間帯に、新しく記憶を得た（うわさ（#33）は、流された時間帯に得た記憶）
+  #   2. 自分宛てに未回答の誘いがある  3. 受けた誘いがあり、いまが朝か昼
   def decides_alone?(resident, context, accepted, time_index)
-    resident.memories.any? { _1.acquired_time_index == time_index - 1 } ||
+    resident.memories.any? { new_memory?(_1, time_index) } ||
       context["invites_to_me"].any? ||
       (accepted.any? && ResidentCatalog.part_of(time_index) != "night")
+  end
+
+  # 伝え聞いた記憶は、伝えられた時間帯の処理の後にできるので、次の時間帯に1回。
+  # うわさは時間帯を進める前に流すので、流されたその時間帯に1回
+  def new_memory?(memory, time_index)
+    memory.source == "rumor" ? memory.acquired_time_index == time_index : memory.acquired_time_index == time_index - 1
+  end
+
+  # 4.（#33）この時間帯に集まりが告知された：住民全員が、行くかどうかを判断する機会を1回得る
+  def announced_now?(time_index)
+    @announced_now ||= {}
+    @announced_now.fetch(time_index) { @announced_now[time_index] = @playthrough.world_events.exists?(kind: "gathering_announced", time_index: time_index) }
   end
 
   def billable? = @responder.respond_to?(:billable?) && @responder.billable?
@@ -144,7 +158,7 @@ class TimeSlotProcessor
       end
 
       changed = move(locations)
-      events, rejected = [], []
+      events, rejected = gatherings_held(time_index, locations), []
       proposals.each do |resident, context, proposal|
         errors = ProposalValidator.call(proposal, context)
         errors += told_errors(proposal) if errors.empty? && proposal["action_type"] == "tell"
@@ -171,6 +185,18 @@ class TimeSlotProcessor
   def move(locations)
     @playthrough.residents.reject { locations.fetch(_1.key) == _1.location_key }
                 .each { _1.update!(location_key: locations.fetch(_1.key)) }.any?
+  end
+
+  # この時間帯に開かれる集まり（#33）：その場所にいた住民を参加者として残す（誰も来なくても記録する）
+  def gatherings_held(time_index, locations)
+    @playthrough.world_events.where(kind: "gathering_announced").select { _1.payload["at"] == time_index }.map do |announced|
+      place = announced.payload.fetch("place")
+      @playthrough.world_events.create!(
+        command_id: "slot#{time_index}-gathering-#{announced.id}", kind: "gathering_held", actor_key: "player",
+        time_index: time_index, cause: announced,
+        payload: { "place" => place, "attendees" => locations.select { _2 == place }.keys.sort }
+      )
+    end
   end
 
   def event_kind(proposal)

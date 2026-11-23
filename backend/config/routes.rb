@@ -9,6 +9,7 @@ Rails.application.routes.draw do
       resource :registration, only: :create # 登録（#16）
       resource :playthrough, only: %i[show create] do
         resources :time_slots, only: :create
+        resources :interventions, only: :create # 特殊介入（#33）
       end
     end
   end

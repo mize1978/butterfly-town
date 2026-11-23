@@ -26,4 +26,8 @@ class ResidentCatalog
     else decided_at + 1..decided_at + 2
     end
   end
+
+  # 特殊介入の集まり（#33）が開かれる時間帯：告知した時間帯の後に来る最初の朝か昼。
+  # 告知を知った時間帯に移動を決めれば、#55 の移動の範囲の始まりと同じなので間に合う
+  def self.gathering_slot(announced_at) = move_window(announced_at).begin
 end

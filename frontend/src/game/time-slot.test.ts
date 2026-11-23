@@ -31,6 +31,16 @@ describe("出来事の文", () => {
     expect(describeEvent({ kind: "worked", actorKey: "b", targetKey: null, factKey: null })).toBe("住民bが祭りの準備をした");
   });
 
+  it("#33：うわさ（中身は出さない）・集まりの告知・開かれた集まり（来た住民／誰も来なかった）", () => {
+    expect(describeEvent({ kind: "rumored", actorKey: "player", targetKey: "a", factKey: "e2" })).toBe("住民aにうわさを流した");
+    expect(describeEvent({ kind: "gathering_announced", actorKey: "player", targetKey: null, factKey: null, place: "plaza", at: 3 }))
+      .toBe("広場で2日目の朝に集まりがあると告知した");
+    expect(describeEvent({ kind: "gathering_held", actorKey: "player", targetKey: null, factKey: null, place: "plaza", attendees: ["b"] }))
+      .toBe("広場で集まりが開かれた（来たのは住民b）");
+    expect(describeEvent({ kind: "gathering_held", actorKey: "player", targetKey: null, factKey: null, place: "shop", attendees: [] }))
+      .toBe("店で集まりが開かれた（誰も来なかった）");
+  });
+
   it("#55：移動は行き先へ向かうことにした、返事は受けた・断ったと書く", () => {
     expect(describeEvent({ kind: "moved", actorKey: "a", targetKey: null, factKey: null, moveTo: "shop" })).toBe("住民aが店へ向かうことにした");
     expect(describeEvent({ kind: "accepted", actorKey: "b", targetKey: "a", factKey: null })).toBe("住民bが住民aの誘いを受けた");

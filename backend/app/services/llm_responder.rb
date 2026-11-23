@@ -125,7 +125,8 @@ class LlmResponder
       "あなたの記憶" => context.fetch("memories"),
       "あなた宛ての、まだ返事をしていない誘い" => context.fetch("invites_to_me"),
       "あなたが出した誘いと、その結果（pending＝返事待ち・accepted＝受けてもらえた・declined＝断られた）" => context.fetch("my_invites"),
-      "知り合いのいつもの居場所（時間帯ごとの日課）" => context.fetch("usual_places")
+      "知り合いのいつもの居場所（時間帯ごとの日課）" => context.fetch("usual_places"),
+      "街で告知された集まりの予定（場所・時間帯。行くかどうかはあなたが決める）" => context.fetch("gatherings")
     }
     "## あなた自身の情報\n#{JSON.pretty_generate(me)}\n\n## 選べる行動\n" + ACTIONS.map { |k, v| "- #{k}：#{v}" }.join("\n")
   end

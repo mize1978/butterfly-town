@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_21_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_23_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -100,7 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_21_000003) do
     t.index ["resident_id", "fact_key"], name: "index_memories_on_resident_id_and_fact_key", unique: true
     t.index ["resident_id"], name: "index_memories_on_resident_id"
     t.index ["source_event_id"], name: "index_memories_on_source_event_id"
-    t.check_constraint "source::text = ANY (ARRAY['witnessed'::character varying, 'told'::character varying, 'initial'::character varying]::text[])", name: "memories_source"
+    t.check_constraint "source::text = ANY (ARRAY['witnessed'::character varying, 'told'::character varying, 'initial'::character varying, 'rumor'::character varying]::text[])", name: "memories_source"
   end
 
   create_table "playthroughs", force: :cascade do |t|

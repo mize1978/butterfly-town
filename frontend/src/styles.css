@@ -120,6 +120,16 @@ p { margin: 0; }
 .slot-title { font-weight: 700; }
 .slot-error { color: var(--clay); }
 .slot-note { color: var(--muted); }
+/* 特殊介入（#33）：「時間帯を進める」の横のボタンと、その下に開くパネル */
+.intervention { position: relative; display: flex; align-items: center; gap: 8px; }
+.intervention-button small { display: block; font-size: 11px; color: var(--muted); }
+.intervention-why { font-size: 12px; }
+.intervention-panel { position: absolute; top: 100%; left: 0; z-index: 5; margin-top: 6px; padding: 10px 12px; min-width: 300px;
+  background: var(--paper, #fbf7ec); border: 1px solid rgba(0, 0, 0, .12); border-radius: 10px; font-size: 13px; }
+.intervention-panel fieldset { border: 0; margin: 0 0 6px; padding: 0; display: flex; gap: 12px; flex-wrap: wrap; }
+.intervention-panel legend { font-weight: 600; margin-bottom: 4px; }
+.intervention-fields { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.intervention-actions { display: flex; gap: 8px; margin: 0; }
 .town-stage[inert] .slot-bar { visibility: hidden; }
 
 /* 中断画面（S22）の最小版：予算不足で時間帯を止めたときに、街の上に重ねる */
