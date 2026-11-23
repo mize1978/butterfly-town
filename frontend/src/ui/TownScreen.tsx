@@ -20,6 +20,7 @@ import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
+import { InterventionPanel } from "./InterventionPanel";
 import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
 
 // 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
@@ -207,6 +208,8 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
                     {slot.sending ? "進めています…" : finished ? "時間帯は終わりました" : slot.error ? "もう一度送る" : "時間帯を進める"}
                     {!finished && <small>{nextStepLabel(playthrough)}</small>}
                   </button>
+                  <InterventionPanel playthrough={playthrough} disabled={slot.sending} onPlaythroughChange={onPlaythroughChange}
+                    onDone={(text) => setSlot((v) => ({ ...v, error: null, note: text }))} />
                   <div id="slot-result" className="slot-result" aria-live="polite">
                     {slot.error && <p className="slot-error" role="alert">{slot.error}。「もう一度送る」で同じ時間帯を送り直します（二重には進みません）。</p>}
                     {slot.note && <p className="slot-note">{slot.note}</p>}

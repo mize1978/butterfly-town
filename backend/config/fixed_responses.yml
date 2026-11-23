@@ -3,6 +3,8 @@
 # AI が自分で判断できることの証明ではない。成立するかは Rails（ProposalValidator）が決める。
 # 上から順に、actor が同じで条件をすべて満たす最初のルールを使う（条件の意味は app/services/fixed_responder.rb）。
 # #55：誘いへの返事・承諾後の作業・店への移動を、Issue #55 の「確認用の筋書き」に合わせて足した
+# #33：B は集まりの告知を知ると行く（A・C は行かない。行くかどうかは住民ごとに違う、の確認用）。
+#      C が伝えるのは A がその場にいるときだけ（もともと C が判断するのは A と同じ場所にいるときだけ）
 rules:
   - id: b_accepts_invite
     actor: b
@@ -13,6 +15,10 @@ rules:
     accepted_invite: true
     parts: [morning, noon]
     response: { action_type: work, target: null, params: { task: setup }, reason: 約束したので準備を進める }
+  - id: b_goes_to_gathering
+    actor: b
+    gathering: true
+    response: { action_type: move, target: null, params: { to: $gathering }, reason: 集まりがあるなら顔を出してみたい }
   - id: a_already_invited
     actor: a
     my_invite: { to: b, status: [pending, accepted, declined] }
@@ -39,6 +45,7 @@ rules:
   - id: c_knows_reason
     actor: c
     requires_known: [e2]
+    present: [a]
     response: { action_type: tell, target: a, params: { fact_key: e2 }, reason: Aの誤解を解きたい }
   - id: default
     response: { action_type: continue_routine, target: null, params: {}, reason: いつもの日課を続ける }

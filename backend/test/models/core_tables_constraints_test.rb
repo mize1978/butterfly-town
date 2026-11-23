@@ -157,7 +157,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
   test "記憶の出どころは決めた値だけ" do
     resident = add_resident(playthrough, ResidentCatalog.keys.first)
     assert_rejected(ActiveRecord::CheckViolation) do
-      Memory.insert!({ resident_id: resident.id, fact_key: "e1", content: "x", source: "rumor" })
+      Memory.insert!({ resident_id: resident.id, fact_key: "e1", content: "x", source: "guess" }) # rumor は #33 で足した出どころ
     end
   end
 

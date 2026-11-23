@@ -4,7 +4,11 @@
 import { parsePlaythrough, PlaythroughError, type PlaythroughState } from "./playthrough";
 
 // moveTo：移動を決めた出来事（moved）の行き先（payload.params.to）。行き先の無い出来事には付けない（#55）
-export type TimeSlotEvent = { kind: string; actorKey: string; targetKey: string | null; factKey: string | null; moveTo?: string };
+// place・at・attendees：特殊介入の集まり（#33）の場所・開く時間帯・参加した住民（payload）。無い出来事には付けない
+export type TimeSlotEvent = {
+  kind: string; actorKey: string; targetKey: string | null; factKey: string | null;
+  moveTo?: string; place?: string; at?: number; attendees?: string[];
+};
 export type TimeSlot = { timeIndex: number; status: string; attempt: number; events: TimeSlotEvent[] };
 // resumeAt：予算が足りずに止めたとき（error = budget）、AI の処理を再開できる時期（ISO 8601）
 export type TimeSlotResult = { ok: boolean; error: string | null; resumeAt?: string | null; state: PlaythroughState; timeSlot: TimeSlot | null };
@@ -13,13 +17,18 @@ const URL = "/api/v1/playthrough/time_slots";
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const strOrNull = (v: unknown) => v === null || v === undefined || typeof v === "string";
 
-function parseEvent(e: unknown): TimeSlotEvent {
+export function parseEvent(e: unknown): TimeSlotEvent {
   if (!isObj(e) || typeof e.kind !== "string" || typeof e.actor_key !== "string" || !strOrNull(e.target_key) || !strOrNull(e.fact_key)) {
     throw new PlaythroughError("時間帯の出来事の形が正しくありません");
   }
   const params = isObj(e.payload) && isObj(e.payload.params) ? e.payload.params : {};
+  const p = isObj(e.payload) ? e.payload : {};
   const event: TimeSlotEvent = { kind: e.kind, actorKey: e.actor_key, targetKey: (e.target_key as string | null) ?? null, factKey: (e.fact_key as string | null) ?? null };
-  return typeof params.to === "string" ? { ...event, moveTo: params.to } : event;
+  if (typeof params.to === "string") event.moveTo = params.to;
+  if (typeof p.place === "string") event.place = p.place;
+  if (Number.isInteger(p.at)) event.at = p.at as number;
+  if (Array.isArray(p.attendees) && p.attendees.every((k) => typeof k === "string")) event.attendees = p.attendees as string[];
+  return event;
 }
 
 function parseTimeSlot(v: unknown): TimeSlot | null {
