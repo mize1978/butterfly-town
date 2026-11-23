@@ -50,16 +50,15 @@ class ToldMemoriesTest < ActiveSupport::TestCase
     before = recorder.contexts.find { _1["resident_key"] == "a" }
     assert_equal %w[e1], before["memories"].map { _1["fact_key"] }
 
-    confirm(2) # 夜（会わない）
-    confirm(3) # 2日目の朝（会わない）
     recorder = Recorder.new
-    result = confirm(4, responder: recorder) # 2日目の昼、また広場で会う
+    # 夜（会わない）。a は前の時間帯に新しく記憶を得たので、ひとりでも判断する（#55）
+    result = confirm(2, responder: recorder)
     after = recorder.contexts.find { _1["resident_key"] == "a" }
     assert_equal %w[e1 e2], after["memories"].map { _1["fact_key"] }
     assert_equal({ "fact_key" => "e2", "source" => "told" }, after["memories"].last.slice("fact_key", "source"))
-    # e2 を知った a は「b を誘う」を選ぶ（b は店にいるので、この時間帯には成り立たない）
-    assert_equal({ "actor_key" => "a", "action_type" => "invite", "errors" => [ "target がその場にいる相手ではない" ] },
-                 result.rejected.find { _1[:actor_key] == "a" }.transform_keys(&:to_s))
+    # e2 を知った a は、相談ではなく「b がいつもいる店へ向かう」を選ぶ（#55。b はその場にいないので誘いはまだ）
+    assert_equal [ %w[moved a] ], result.events.map { [ _1.kind, _1.actor_key ] }
+    assert_empty result.rejected
   end
 
   test "同じ時間帯を再送しても、記憶は増えない" do
@@ -75,9 +74,8 @@ class ToldMemoriesTest < ActiveSupport::TestCase
     confirm(0)
     confirm(1)
     confirm(2)
-    confirm(3)
     assert_no_difference -> { Memory.count } do
-      result = confirm(4) # c はまた a に e2 を伝えようとする
+      result = confirm(3) # 2日目の朝、店で会った c はまた a に e2 を伝えようとする（#55 で a が店へ向かうようになった）
       assert_includes result.rejected.find { _1[:actor_key] == "c" }[:errors], "相手はもうその事実を知っている"
     end
     assert_equal 1, @pt.world_events.where(kind: "told").count

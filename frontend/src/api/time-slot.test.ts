@@ -34,6 +34,13 @@ describe("時間帯を確定する（confirmTimeSlot）", () => {
     });
   });
 
+  it("#55：移動を決めた出来事は、行き先（payload.params.to）を moveTo として受け取る", async () => {
+    const moved = { ...SLOT, events: [{ kind: "moved", actor_key: "a", target_key: null, fact_key: null, payload: { params: { to: "shop" }, reason: "x" } }] };
+    vi.stubGlobal("fetch", vi.fn(async () => json({ state: STATE, time_slot: moved })));
+    const r = await confirmTimeSlot(1);
+    expect(r.timeSlot?.events).toEqual([{ kind: "moved", actorKey: "a", targetKey: null, factKey: null, moveTo: "shop" }]);
+  });
+
   it("409 は失敗として投げず、理由（error）と Rails のいまの状態を返す", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ state: { ...STATE, time_index: 5 }, error: "time_index_mismatch" }, 409)));
     const r = await confirmTimeSlot(2);

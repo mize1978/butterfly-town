@@ -30,6 +30,12 @@ describe("出来事の文", () => {
     expect(describeEvent({ kind: "invited", actorKey: "a", targetKey: "b", factKey: null })).toBe("住民aが住民bを準備に誘った");
     expect(describeEvent({ kind: "worked", actorKey: "b", targetKey: null, factKey: null })).toBe("住民bが祭りの準備をした");
   });
+
+  it("#55：移動は行き先へ向かうことにした、返事は受けた・断ったと書く", () => {
+    expect(describeEvent({ kind: "moved", actorKey: "a", targetKey: null, factKey: null, moveTo: "shop" })).toBe("住民aが店へ向かうことにした");
+    expect(describeEvent({ kind: "accepted", actorKey: "b", targetKey: "a", factKey: null })).toBe("住民bが住民aの誘いを受けた");
+    expect(describeEvent({ kind: "declined", actorKey: "b", targetKey: "a", factKey: null })).toBe("住民bが住民aの誘いを断った");
+  });
 });
 
 describe("409 の理由の案内", () => {

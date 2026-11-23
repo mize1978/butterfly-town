@@ -1,7 +1,7 @@
 # 実LLM で住民が判断する（#30）。値はすべて仮（#30 の PR でみぜが決める）
 # 使うのは RESIDENT_RESPONDER=llm のときだけ。API キーは環境変数 ANTHROPIC_API_KEY だけに置く（このファイルには書かない）
 model: claude-haiku-5-5        # 技術試作（#5）で使ったモデル。単価は config/ai_budget.yml
-prompt_version: v1             # 技術試作 compare-v1 と同じ指示文
+prompt_version: v2             # v1＝技術試作 compare-v1 と同じ指示文。v2＝#55 で返事・移動の意味と、誘い・いつもの居場所の入力を足した
 max_output_tokens: 1024        # 出力の上限。予約額はこれで計算する。試作の実測は最大235トークン
 timeout_seconds: 15            # 1回の呼び出しを待つ上限。試作の p95 は約2.3秒
 count_tokens_timeout_seconds: 10
