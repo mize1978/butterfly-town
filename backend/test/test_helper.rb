@@ -11,6 +11,7 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require_relative "support/test_data"
 
 module ActiveSupport
   class TestCase
@@ -20,6 +21,7 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
-    # Add more helper methods to be used by all tests here...
+    # テストデータの作り方（ゲスト・街・住民・記憶・時間帯の処理・AI 呼び出し）は test/support/test_data.rb（#47）
+    include TestData
   end
 end

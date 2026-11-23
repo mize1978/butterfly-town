@@ -8,9 +8,7 @@ class AiBudgetTest < ActiveSupport::TestCase
 
   setup { @budget = AiBudget.default }
 
-  def reserve(purpose: "dev", input_tokens: 2000, max_output_tokens: 300, now: NOW, **owner)
-    @budget.reserve!(purpose:, model: MODEL, input_tokens:, max_output_tokens:, now:, **owner)
-  end
+  def reserve(now: NOW, **args) = reserve_ai_call(model: MODEL, now:, budget: @budget, **args)
 
   def month = AiBudgetMonth.find_by!(month: "2026-11")
 
@@ -131,9 +129,9 @@ class AiBudgetTest < ActiveSupport::TestCase
   # --- ゲームの判断・会話・要約・再試行・開発検証は同じ予算 ---
 
   test "判断・会話・要約・再試行・開発検証のどれも、同じ月の行で数える" do
-    guest, = Guest.issue!
-    pt, = Playthrough.start_for!(guest)
-    run = TimeSlotRun.create!(playthrough: pt, time_index: 0, status: "running", base_state_version: 0)
+    pt = start_playthrough
+    guest = pt.guest
+    run = time_slot_run(pt, time_index: 0, status: "running", base_state_version: 0)
     reserve(purpose: "decision", playthrough: pt, guest: guest, time_slot_run: run, attempt: 1)
     reserve(purpose: "decision", playthrough: pt, guest: guest, time_slot_run: run, attempt: 2) # 再試行
     reserve(purpose: "conversation", playthrough: pt, guest: guest)
@@ -157,8 +155,8 @@ class AiBudgetTest < ActiveSupport::TestCase
   end
 
   test "返答待ちの会話は街に1つだけ" do
-    guest, = Guest.issue!
-    pt, = Playthrough.start_for!(guest)
+    pt = start_playthrough
+    guest = pt.guest
     reserve(purpose: "conversation", playthrough: pt, guest: guest)
     assert_rejected(ActiveRecord::RecordNotUnique) { reserve(purpose: "conversation", playthrough: pt, guest: guest) }
   end

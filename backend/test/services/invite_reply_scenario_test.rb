@@ -16,8 +16,7 @@ class InviteReplyScenarioTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
   end
 
   def counts
@@ -26,7 +25,7 @@ class InviteReplyScenarioTest < ActiveSupport::TestCase
       progress: @pt.festival_progress, plans: @pt.residents.order(:key).pluck(:current_plan), relationships: @pt.relationships.count }
   end
 
-  def location(key) = @pt.residents.find_by!(key: key).location_key
+  def location(key) = resident_of(@pt, key).location_key
 
   def summarize(events) = events.map { [ _1.kind, _1.actor_key, _1.target_key ].compact.join(":") }
 

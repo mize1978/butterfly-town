@@ -22,13 +22,12 @@ class InviteReplyTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
   end
 
   def confirm(script, time_index = @pt.reload.time_index) = TimeSlotProcessor.new(@pt, responder: script).call(time_index: time_index)
   def run_until(script, last) = (@pt.reload.time_index..last).map { confirm(script, _1) }
-  def resident(key) = @pt.residents.find_by!(key: key)
+  def resident(key) = resident_of(@pt, key)
   def memory_count = Memory.joins(:resident).where(residents: { playthrough_id: @pt.id }).count
   def rejected(result, key) = result.rejected.find { _1[:actor_key] == key }&.fetch(:errors)
   def reply(to, answer) = { "action_type" => "reply", "target" => to, "params" => { "task" => "setup", "answer" => answer }, "reason" => "x" }
@@ -95,7 +94,7 @@ class InviteReplyTest < ActiveSupport::TestCase
   test "離れている相手への返事は成り立つが、同じ相手を invite・consult・tell に選ぶと、その場にいないので成り立たない" do
     %w[invite consult tell].each do |type|
       params = { "invite" => { "task" => "setup" }, "consult" => { "about" => "c" }, "tell" => { "fact_key" => "e2" } }.fetch(type)
-      setup_playthrough = Playthrough.start_for!(Guest.issue!.first).first
+      setup_playthrough = start_playthrough
       script = Script.new([ 5, "b" ] => { "action_type" => type, "target" => "a", "params" => params, "reason" => "x" })
       (0..4).each { TimeSlotProcessor.new(setup_playthrough, responder: script).call(time_index: _1) }
 
