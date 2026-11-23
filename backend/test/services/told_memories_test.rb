@@ -21,15 +21,14 @@ class ToldMemoriesTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
   end
 
   def confirm(time_index = @pt.reload.time_index, responder: FixedResponder.default)
     TimeSlotProcessor.new(@pt, responder: responder).call(time_index: time_index)
   end
 
-  def memories_of(key) = @pt.residents.find_by!(key: key).memories.order(:id)
+  def memories_of(key) = resident_of(@pt, key).memories.order(:id)
 
   test "伝える行動が成立すると、受け手の記憶が出どころの出来事つきでできる" do
     confirm(0)

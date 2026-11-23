@@ -22,8 +22,7 @@ class TimeSlotBudgetTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
     @budget = AiBudget.default
     TimeSlotProcessor.new(@pt).call(time_index: 0) # 朝は誰も会わない
   end

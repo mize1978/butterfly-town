@@ -34,8 +34,7 @@ class TimeSlotLlmTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
     TimeSlotProcessor.new(@pt).call(time_index: 0) # 朝は誰も会わない
     @outside = ActiveRecord::Base.connection.open_transactions # テストそのもののトランザクションの分
   end

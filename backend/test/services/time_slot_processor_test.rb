@@ -27,8 +27,7 @@ class TimeSlotProcessorTest < ActiveSupport::TestCase
   end
 
   setup do
-    guest, = Guest.issue!
-    @pt, = Playthrough.start_for!(guest)
+    @pt = start_playthrough
   end
 
   def confirm(time_index = @pt.reload.time_index, responder: FixedResponder.default)
@@ -136,7 +135,7 @@ class TimeSlotProcessorTest < ActiveSupport::TestCase
   end
 
   test "処理中の時間帯には、もう1つの処理を始めない" do
-    TimeSlotRun.create!(playthrough: @pt, time_index: 0, status: "running", base_state_version: 0)
+    time_slot_run(@pt, time_index: 0, status: "running", base_state_version: 0)
     assert_equal :conflict, confirm(0).status
     assert_equal 0, @pt.reload.time_index
   end

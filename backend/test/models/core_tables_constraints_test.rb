@@ -4,8 +4,10 @@ require "minitest/mock"
 # ER図（docs/er-diagram.md）の「図だけでは伝わらない決まり」を、DB の制約が守ることを確かめる。
 # モデルの検証を通さずに DB へ直接書き込み、DB 自身が拒否するかを見る
 class CoreTablesConstraintsTest < ActiveSupport::TestCase
-  def guest = Guest.create!(token_digest: SecureRandom.hex(32))
-  def playthrough(**attrs) = Playthrough.create!({ guest: guest, mission_key: "festival" }.merge(attrs))
+  # ゲスト・街・住民・記憶・時間帯の処理は test/support/test_data.rb（#47）で作る。
+  # 住民や記憶の制約を確かめるため、街は住民の無い empty_playthrough から始める
+  def guest = new_guest
+  def playthrough(**attrs) = empty_playthrough(**attrs)
 
   # DB が拒否することを確かめる。拒否されると PostgreSQL はその取引の続きを受け付けないので、
   # セーブポイントの中で試して、拒否された分だけを取り消す
@@ -68,7 +70,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "同じゲストの進行中の街も1つだけ（#7：開始が同時に届いても2つ作らない）" do
     g = guest
-    Playthrough.create!(guest: g, mission_key: "festival")
+    empty_playthrough(guest: g)
     assert_rejected(ActiveRecord::RecordNotUnique) do
       Playthrough.insert!({ mission_key: "festival", guest_id: g.id, status: "in_progress" })
     end
@@ -77,7 +79,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "開始が同時に届いて一意制約にぶつかったら、先にできた街を返す" do
     g = guest
-    other = Playthrough.create!(guest: g, mission_key: "festival") # もう1つのリクエストが先に作り終えた街
+    other = empty_playthrough(guest: g) # もう1つのリクエストが先に作り終えた街
     original = Playthrough.method(:current_for)
     calls = 0
     # こちらが最初に探したときは、まだ見えていなかったことにする（2回目からは本物）
@@ -93,7 +95,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "処理中の時間帯は街に1つだけ" do
     pt = playthrough
-    TimeSlotRun.create!(playthrough: pt, time_index: 0, status: "running", base_state_version: 0)
+    time_slot_run(pt, time_index: 0, status: "running", base_state_version: 0)
     assert_rejected(ActiveRecord::RecordNotUnique) do
       TimeSlotRun.insert!({ playthrough_id: pt.id, time_index: 1, status: "running", base_state_version: 0 })
     end
@@ -101,15 +103,15 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "同じ時間帯の処理は1行だけ（やり直しは attempt を増やす）" do
     pt = playthrough
-    TimeSlotRun.create!(playthrough: pt, time_index: 0, status: "confirmed", base_state_version: 0)
+    time_slot_run(pt, time_index: 0, status: "confirmed", base_state_version: 0)
     assert_rejected(ActiveRecord::RecordNotUnique) do
       TimeSlotRun.insert!({ playthrough_id: pt.id, time_index: 0, status: "failed", base_state_version: 0 })
     end
   end
 
   test "別の街なら、それぞれ処理中の時間帯を持てる" do
-    TimeSlotRun.create!(playthrough: playthrough, time_index: 0, status: "running", base_state_version: 0)
-    TimeSlotRun.create!(playthrough: playthrough, time_index: 0, status: "running", base_state_version: 0)
+    time_slot_run(playthrough, time_index: 0, status: "running", base_state_version: 0)
+    time_slot_run(playthrough, time_index: 0, status: "running", base_state_version: 0)
     assert_equal 2, TimeSlotRun.where(status: "running").count
   end
 
@@ -124,7 +126,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "設定ファイルにある住民キーは入り、同じ街に同じ住民は2人いない" do
     pt = playthrough
-    ResidentCatalog.keys.each { |key| Resident.create!(playthrough: pt, key: key) }
+    ResidentCatalog.keys.each { |key| add_resident(pt, key) }
     assert_rejected(ActiveRecord::RecordNotUnique) do
       Resident.insert!({ playthrough_id: pt.id, key: ResidentCatalog.keys.first })
     end
@@ -141,8 +143,8 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
 
   test "同じ住民に同じ記憶、同じ街に同じ出来事は2つ作れない" do
     pt = playthrough
-    resident = Resident.create!(playthrough: pt, key: ResidentCatalog.keys.first)
-    Memory.create!(resident: resident, fact_key: "e1", content: "Bは昨年の準備に参加しなかった", source: "initial")
+    resident = add_resident(pt, ResidentCatalog.keys.first)
+    add_memory(resident, "e1", source: "initial")
     assert_rejected(ActiveRecord::RecordNotUnique) do
       Memory.insert!({ resident_id: resident.id, fact_key: "e1", content: "重複", source: "initial" })
     end
@@ -153,7 +155,7 @@ class CoreTablesConstraintsTest < ActiveSupport::TestCase
   end
 
   test "記憶の出どころは決めた値だけ" do
-    resident = Resident.create!(playthrough: playthrough, key: ResidentCatalog.keys.first)
+    resident = add_resident(playthrough, ResidentCatalog.keys.first)
     assert_rejected(ActiveRecord::CheckViolation) do
       Memory.insert!({ resident_id: resident.id, fact_key: "e1", content: "x", source: "rumor" })
     end

@@ -45,10 +45,11 @@ class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
   test "予算が足りずに止めたときは 409 で、理由 budget と再開できる時期を返す。時間帯は進まない" do
     post api_v1_playthrough_path
     resume = ActiveSupport::TimeZone["Asia/Tokyo"].local(2026, 12, 1) # 予算の月の区切りは日本時間
+    make_run = method(:time_slot_run) # 処理の代わりのクラスからも、テストと同じ作り方で時間帯の処理を作る（#47）
     stopped = Class.new do
       define_method(:initialize) { |pt| @pt = pt }
       define_method(:call) do |time_index:|
-        run = TimeSlotRun.create!(playthrough: @pt, time_index: time_index, status: "suspended", suspend_reason: "budget", base_state_version: 0)
+        run = make_run.call(@pt, time_index: time_index, status: "suspended", suspend_reason: "budget", base_state_version: 0)
         TimeSlotProcessor::Result.new(status: :suspended, run: run, events: [], rejected: [], error: "budget", resume_at: resume)
       end
     end
