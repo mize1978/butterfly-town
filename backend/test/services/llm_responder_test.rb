@@ -37,12 +37,13 @@ class LlmResponderTest < ActiveSupport::TestCase
     "present" => %w[b c], "locations" => %w[plaza shop home],
     "personality" => [ "約束を重視" ], "goals" => [ "祭りを成功させる" ],
     "memories" => [ { "fact_key" => "e1", "content" => "Bは昨年の準備に参加しなかった",
-                      "interpretation" => "Bは約束を軽く考えているのかもしれない", "source" => "observation" } ]
+                      "interpretation" => "Bは約束を軽く考えているのかもしれない", "source" => "observation" } ],
+    "invites_to_me" => [], "my_invites" => [], "usual_places" => {}
   }.freeze
 
   def reply(**over)
     { "actor" => "a", "action_type" => "invite", "target" => "b",
-      "params" => { "task" => "setup", "fact_key" => nil, "about" => nil, "to" => nil },
+      "params" => { "task" => "setup", "fact_key" => nil, "about" => nil, "to" => nil, "answer" => nil },
       "reason" => "今年は一緒に準備したい" }.merge(over.transform_keys(&:to_s))
   end
 
@@ -75,6 +76,31 @@ class LlmResponderTest < ActiveSupport::TestCase
     assert_equal [ "a" ], schema.dig(:properties, :actor, :enum)
     assert_equal %w[b c], schema.dig(:properties, :target, :anyOf, 0, :enum)
     assert_equal ProposalValidator::ACTIONS, schema.dig(:properties, :action_type, :enum)
+  end
+
+  test "#55：誘い・自分の誘いの結果・いつもの居場所を渡し、返事の相手として離れた誘い主も選べる。受けた誘いは渡さない" do
+    context = CONTEXT.merge(
+      "resident_key" => "b", "present" => [], "memories" => [],
+      "invites_to_me" => [ { "from" => "a", "task" => "setup" } ],
+      "my_invites" => [ { "to" => "c", "task" => "setup", "status" => "declined" } ],
+      "usual_places" => { "a" => { "morning" => "plaza", "noon" => "plaza", "night" => "home_a" } },
+      "accepted_invites_to_me" => [ { "from" => "zzz", "task" => "setup" } ]
+    )
+    client = FakeClient.new(reply: reply(actor: "b", action_type: "reply", target: "a",
+                                         params: { "task" => "setup", "answer" => "accept" }))
+    proposal, = responder(client).call_billed(context)
+    req = client.created.first
+    text = req[:messages].first[:content]
+    assert_includes text, "あなた宛ての、まだ返事をしていない誘い"
+    assert_includes text, "declined"
+    assert_includes text, "home_a"
+    refute_includes text, "zzz"
+    assert_includes req[:system_], "reply（誘いへの返事）だけは"
+    schema = req.dig(:output_config, :format, :schema)
+    assert_equal [ "a" ], schema.dig(:properties, :target, :anyOf, 0, :enum)
+    assert_includes schema.dig(:properties, :params, :required), "answer"
+    assert_equal({ "task" => "setup", "answer" => "accept" }, proposal["params"])
+    assert_equal "v2", LlmResponder.config.fetch("prompt_version")
   end
 
   test "返答の行動案と使用量を返す。使わない params（null）は外す" do

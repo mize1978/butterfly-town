@@ -2,12 +2,15 @@
 #
 #   1. 受け付け（短いロック）：いまの時間帯か確かめ、時間帯の処理（time_slot_runs）を running にする。
 #      やり直しなら同じ行の attempt を1増やす。開始時点の state_version を base_state_version に残す
-#   2. 判断（ロックなし）：日課で場所を動かした後に、同じ場所に相手がいる住民だけが応答（決まった応答・実LLM）を使う
+#   2. 判断（ロックなし）：日課（と移動の予定）で場所を動かした後に、同じ場所に相手がいる住民と、
+#      ひとりでも判断する条件（#55）に当てはまる住民だけが応答（決まった応答・実LLM）を使う
 #   3. 反映（ロック）：試行番号と state_version が開始時と同じときだけ、成り立つ行動を出来事にし、時間帯を進める。
 #      違えば反映しない（古い状態から作った案・前の試行の遅れた結果）
 #
 # 出来事の command_id は「時間帯・住民」で決まるので、同じ時間帯を2回確定しても出来事は増えない。
-# 伝える行動が成立したときだけ、受け手の記憶を作る（#9）
+# 伝える行動が成立したときだけ、受け手の記憶を作る（#9）。
+# 返事（#55）は accepted / declined の出来事だけを残す（記憶・進み具合・関係値は変えない）。
+# 移動（#55）は出来事と移動の予定（residents.current_plan）を残し、次の朝か昼から反映する
 #
 # 費用のかかる応答（実LLM。billable? が true のもの）は、呼ぶ前に AiBudget で予約する（#10）。
 # 予算が足りなければ、その時間帯を確定させずに止め（suspended・budget）、再開できる時期を返す。
@@ -18,6 +21,7 @@
 class TimeSlotProcessor
   Result = Struct.new(:status, :run, :events, :rejected, :error, :resume_at, keyword_init: true)
   EVENT_KINDS = { "invite" => "invited", "consult" => "consulted", "tell" => "told", "work" => "worked", "move" => "moved" }.freeze
+  REPLY_KINDS = { "accept" => "accepted", "decline" => "declined" }.freeze
 
   def initialize(playthrough, responder: ResidentResponder.default, budget: AiBudget.default)
     @playthrough, @responder, @budget = playthrough, responder, budget
@@ -63,26 +67,45 @@ class TimeSlotProcessor
     end
   end
 
-  # 日課：この時間帯に、住民ごとに居る場所（Rails が決める）
+  # この時間帯に、住民ごとに居る場所（Rails が決める）。移動の予定の範囲内なら移動先、それ以外は日課の場所
   def routine_locations(time_index)
-    @playthrough.residents.to_h { [ _1.key, ResidentCatalog.location_at(_1.key, time_index) ] }
+    @playthrough.residents.to_h do |resident|
+      plan = resident.current_plan
+      planned = plan && plan["type"] == "move" && (plan.fetch("from")..plan.fetch("until")).cover?(time_index)
+      [ resident.key, planned ? plan.fetch("to") : ResidentCatalog.location_at(resident.key, time_index) ]
+    end
   end
 
-  # 同じ場所に相手がいる住民だけが判断する。返すのは [住民, 入力, 行動案] の並び
+  # 判断する住民：同じ場所に相手がいる、または、ひとりでも判断する条件に当てはまる。返すのは [住民, 入力, 行動案] の並び
   def decide(locations, run, attempt, base_version, time_index)
+    invitations = Invitations.new(@playthrough)
     @playthrough.residents.includes(:memories).sort_by(&:key).filter_map do |resident|
-      context = ResidentContext.build(resident, @playthrough, locations: locations)
-      next if context["present"].empty?
+      context = ResidentContext.build(resident, @playthrough, locations: locations, invitations: invitations)
+      accepted = invitations.accepted_to(resident.key)
+      next unless context["present"].any? || decides_alone?(resident, context, accepted, time_index)
 
-      [ resident, context, respond(context, run, attempt, base_version, time_index) ]
+      rails_only = { accepted_invites_to_me: accepted.map { { "from" => _1.from, "task" => _1.task } } }
+      [ resident, context, respond(context, rails_only, run, attempt, base_version, time_index) ]
     end
+  end
+
+  # ひとりでも判断する条件（#55）。与えるのは判断の機会だけで、何をするかは住民が選ぶ
+  #   1. 前の時間帯に、新しく記憶を得た  2. 自分宛てに未回答の誘いがある  3. 受けた誘いがあり、いまが朝か昼
+  def decides_alone?(resident, context, accepted, time_index)
+    resident.memories.any? { _1.acquired_time_index == time_index - 1 } ||
+      context["invites_to_me"].any? ||
+      (accepted.any? && ResidentCatalog.part_of(time_index) != "night")
   end
 
   def billable? = @responder.respond_to?(:billable?) && @responder.billable?
 
-  # 費用のかかる応答は、予約 → 呼び出し → 精算の順に AiBudget を通す（再試行も attempt つきで同じ予算に数える）
-  def respond(context, run, attempt, base_version, time_index)
-    return @responder.call(context) unless billable?
+  # 費用のかかる応答は、予約 → 呼び出し → 精算の順に AiBudget を通す（再試行も attempt つきで同じ予算に数える）。
+  # rails_only（受けた誘い）は、受け取れる応答（決まった応答）にだけ渡す。実LLM の入力には入れない
+  def respond(context, rails_only, run, attempt, base_version, time_index)
+    unless billable?
+      takes_rails_only = @responder.method(:call).parameters.any? { |kind, _| %i[key keyrest].include?(kind) }
+      return takes_rails_only ? @responder.call(context, **rails_only) : @responder.call(context)
+    end
 
     input_tokens, max_output_tokens = @responder.estimate(context)
     @budget.with_call(model: @responder.model, purpose: "decision", input_tokens:, max_output_tokens:,
@@ -127,13 +150,14 @@ class TimeSlotProcessor
         errors += told_errors(proposal) if errors.empty? && proposal["action_type"] == "tell"
         next rejected << { actor_key: resident.key, action_type: proposal["action_type"], errors: errors } if errors.any?
 
-        kind = EVENT_KINDS[proposal["action_type"]]
+        kind = event_kind(proposal)
         next unless kind # continue_routine は出来事にしない
 
-        event = record(resident, kind, proposal, time_index)
+        event = record(resident, kind, proposal, time_index, cause: reply_cause(resident, proposal))
         events << event
         @playthrough.festival_progress += 1 if kind == "worked"
         learn!(resident, event) if kind == "told"
+        plan_move!(resident, proposal, time_index) if kind == "moved"
       end
       @playthrough.state_version += 1 if changed || events.any?
       finish_slot(time_index)
@@ -149,11 +173,31 @@ class TimeSlotProcessor
                 .each { _1.update!(location_key: locations.fetch(_1.key)) }.any?
   end
 
-  def record(resident, kind, proposal, time_index)
+  def event_kind(proposal)
+    return REPLY_KINDS.fetch(proposal.dig("params", "answer")) if proposal["action_type"] == "reply"
+
+    EVENT_KINDS[proposal["action_type"]]
+  end
+
+  # 返事は、返事をした住民宛ての未回答の誘い（検証済み）を cause にする
+  def reply_cause(resident, proposal)
+    return nil unless proposal["action_type"] == "reply"
+
+    Invitations.new(@playthrough).pending_from(from: proposal["target"], to: resident.key, task: proposal.dig("params", "task")).event
+  end
+
+  # 移動の予定：決めた後に来る最初の朝か昼から、その日の昼まで移動先にいる（夜は日課の場所）
+  def plan_move!(resident, proposal, time_index)
+    window = ResidentCatalog.move_window(time_index)
+    resident.update!(current_plan: { "type" => "move", "to" => proposal.dig("params", "to"), "from" => window.begin, "until" => window.end },
+                     plan_time_index: time_index)
+  end
+
+  def record(resident, kind, proposal, time_index, cause: nil)
     params = proposal["params"] || {}
     @playthrough.world_events.create!(
       command_id: "slot#{time_index}-#{resident.key}", kind: kind, actor_key: resident.key, target_key: proposal["target"],
-      time_index: time_index, fact_key: params["fact_key"],
+      time_index: time_index, fact_key: params["fact_key"], cause: cause,
       payload: { "params" => params, "reason" => proposal["reason"], "rule_id" => proposal["rule_id"] }.compact
     )
   end

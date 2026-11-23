@@ -15,4 +15,15 @@ class ResidentCatalog
   def self.initial_location(key) = location_at(key, 0)
   # その時間帯に日課で居る場所
   def self.location_at(key, time_index) = find(key).fetch("routine").fetch(part_of(time_index))
+  def self.routine(key) = find(key).fetch("routine")
+
+  # 移動を決めた時間帯から、移動先にいる時間帯の範囲（#55）。決めた後に来る最初の朝か昼から、その日の昼まで。
+  # 夜は範囲に入らない（日課の場所＝家に戻る）。朝→同じ日の昼、昼→翌日の朝・昼、夜→翌日の朝・昼
+  def self.move_window(decided_at)
+    case part_of(decided_at)
+    when "morning" then decided_at + 1..decided_at + 1
+    when "noon" then decided_at + 2..decided_at + 3
+    else decided_at + 1..decided_at + 2
+    end
+  end
 end

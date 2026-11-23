@@ -1,12 +1,36 @@
-# 決まった応答（#8）。実LLM（#11）の代わりに、本人が知っている事実（fact_key）の条件だけで行動案を1つ返す。
+# 決まった応答（#8）。実LLM（#11）の代わりに、本人が知っている事実（fact_key）などの条件だけで行動案を1つ返す。
 # 技術試作（three-resident-spike）の fixtures/spike/fixed_responses.json を本編の key に合わせて移した。
 # AI が自分で判断できることの証明ではない。成立するかは Rails（ProposalValidator）が決める。
-# 上から順に、actor が同じで requires_known をすべて知り、requires_unknown を1つも知らない最初のルールを使う
+# 上から順に、actor が同じで条件をすべて満たす最初のルールを使う（条件の意味は app/services/fixed_responder.rb）。
+# #55：誘いへの返事・承諾後の作業・店への移動を、Issue #55 の「確認用の筋書き」に合わせて足した
 rules:
+  - id: b_accepts_invite
+    actor: b
+    invite_to_me: pending
+    response: { action_type: reply, target: a, params: { task: setup, answer: accept }, reason: 事情を分かってくれたなら、今年は手伝いたい }
+  - id: b_works_after_accepting
+    actor: b
+    accepted_invite: true
+    parts: [morning, noon]
+    response: { action_type: work, target: null, params: { task: setup }, reason: 約束したので準備を進める }
+  - id: a_already_invited
+    actor: a
+    my_invite: { to: b, status: [pending, accepted, declined] }
+    response: { action_type: continue_routine, target: null, params: {}, reason: Bにはもう声をかけたので、いつもの日課に戻る }
   - id: a_knows_absence_and_reason
     actor: a
     requires_known: [e1, e2]
+    present: [b]
     response: { action_type: invite, target: b, params: { task: setup }, reason: 事情が分かったので、今年は一緒に準備したい }
+  - id: a_waits_at_shop
+    actor: a
+    requires_known: [e1, e2]
+    location: shop
+    response: { action_type: continue_routine, target: null, params: {}, reason: Bが店に来るのを待つ }
+  - id: a_heads_to_shop
+    actor: a
+    requires_known: [e1, e2]
+    response: { action_type: move, target: null, params: { to: shop }, reason: Bがいつもいる店へ行って、直接話したい }
   - id: a_knows_absence_only
     actor: a
     requires_known: [e1]

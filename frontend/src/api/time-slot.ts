@@ -3,7 +3,8 @@
 // 409（時間帯のずれ・処理中・中断・終わった街）は失敗として投げず、理由と Rails のいまの状態を返す
 import { parsePlaythrough, PlaythroughError, type PlaythroughState } from "./playthrough";
 
-export type TimeSlotEvent = { kind: string; actorKey: string; targetKey: string | null; factKey: string | null };
+// moveTo：移動を決めた出来事（moved）の行き先（payload.params.to）。行き先の無い出来事には付けない（#55）
+export type TimeSlotEvent = { kind: string; actorKey: string; targetKey: string | null; factKey: string | null; moveTo?: string };
 export type TimeSlot = { timeIndex: number; status: string; attempt: number; events: TimeSlotEvent[] };
 // resumeAt：予算が足りずに止めたとき（error = budget）、AI の処理を再開できる時期（ISO 8601）
 export type TimeSlotResult = { ok: boolean; error: string | null; resumeAt?: string | null; state: PlaythroughState; timeSlot: TimeSlot | null };
@@ -16,7 +17,9 @@ function parseEvent(e: unknown): TimeSlotEvent {
   if (!isObj(e) || typeof e.kind !== "string" || typeof e.actor_key !== "string" || !strOrNull(e.target_key) || !strOrNull(e.fact_key)) {
     throw new PlaythroughError("時間帯の出来事の形が正しくありません");
   }
-  return { kind: e.kind, actorKey: e.actor_key, targetKey: (e.target_key as string | null) ?? null, factKey: (e.fact_key as string | null) ?? null };
+  const params = isObj(e.payload) && isObj(e.payload.params) ? e.payload.params : {};
+  const event: TimeSlotEvent = { kind: e.kind, actorKey: e.actor_key, targetKey: (e.target_key as string | null) ?? null, factKey: (e.fact_key as string | null) ?? null };
+  return typeof params.to === "string" ? { ...event, moveTo: params.to } : event;
 }
 
 function parseTimeSlot(v: unknown): TimeSlot | null {

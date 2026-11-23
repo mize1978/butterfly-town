@@ -16,13 +16,19 @@ export function nextStepLabel(s: PlaythroughState): string {
 }
 
 const who = (key: string | null) => `住民${key ?? "?"}`;
+// 場所の呼び方（config/residents.yml の locations。名前は仮）
+const PLACES: Record<string, string> = { plaza: "広場", shop: "店", home_a: "住民aの家", home_b: "住民bの家", home_c: "住民cの家" };
+const place = (key: string | null | undefined) => (key ? PLACES[key] ?? key : "どこか");
 export function describeEvent(e: TimeSlotEvent): string {
   switch (e.kind) {
     case "consulted": return `${who(e.actorKey)}が${who(e.targetKey)}に相談した`;
     case "told": return `${who(e.actorKey)}が${who(e.targetKey)}に、知っていることを伝えた`;
     case "invited": return `${who(e.actorKey)}が${who(e.targetKey)}を準備に誘った`;
     case "worked": return `${who(e.actorKey)}が祭りの準備をした`;
-    case "moved": return `${who(e.actorKey)}が移動した`;
+    // 移動は決めた時間帯の出来事で、実際に行き先にいるのは次の朝か昼から（#55）
+    case "moved": return `${who(e.actorKey)}が${place(e.moveTo)}へ向かうことにした`;
+    case "accepted": return `${who(e.actorKey)}が${who(e.targetKey)}の誘いを受けた`;
+    case "declined": return `${who(e.actorKey)}が${who(e.targetKey)}の誘いを断った`;
     default: return `${who(e.actorKey)}の出来事（${e.kind}）`;
   }
 }
