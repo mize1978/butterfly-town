@@ -11,8 +11,9 @@ class TimeSlotLlmTest < ActiveSupport::TestCase
   class Responder
     attr_reader :seen, :calls
 
-    def initialize(model: MODEL, input_tokens: 2000, estimate_error: nil, &on_call)
-      @model, @input, @estimate_error, @on_call, @seen, @calls = model, input_tokens, estimate_error, on_call, [], 0
+    # proposal：返す行動案を差し替える（context を受け取る）。指定がなければ決まった応答と同じ案を返す
+    def initialize(model: MODEL, input_tokens: 2000, estimate_error: nil, proposal: nil, &on_call)
+      @model, @input, @estimate_error, @proposal, @on_call, @seen, @calls = model, input_tokens, estimate_error, proposal, on_call, [], 0
     end
 
     def billable? = true
@@ -29,7 +30,7 @@ class TimeSlotLlmTest < ActiveSupport::TestCase
       @calls += 1
       @seen << ActiveRecord::Base.connection.open_transactions
       @on_call&.call
-      [ FixedResponder.default.call(context), { "input_tokens" => 1387, "output_tokens" => 235 } ]
+      [ @proposal ? @proposal.call(context) : FixedResponder.default.call(context), { "input_tokens" => 1387, "output_tokens" => 235 } ]
     end
   end
 
@@ -80,5 +81,32 @@ class TimeSlotLlmTest < ActiveSupport::TestCase
   test "結果が分からない（タイムアウトなど）ときは、これまでどおり unknown_result" do
     result = confirm(Responder.new { raise Timeout::Error })
     assert_equal [ :suspended, "unknown_result" ], [ result.status, result.error ]
+  end
+
+  test "実LLM の案が Rails の検証で却下されたときは、出来事にせず rejected に理由を返す。時間帯は確定して進み、利用記録は残る" do
+    # その場にいない相手を誘う案（検証で「target がその場にいる相手ではない」になる）
+    responder = Responder.new(proposal: ->(context) { { "actor" => context.fetch("resident_key"), "action_type" => "invite",
+                                                        "target" => "nobody", "params" => { "task" => "setup" } } })
+    result = confirm(responder)
+
+    # 時間帯は確定して進む
+    assert_equal :confirmed, result.status
+    assert_equal "confirmed", slot_run.status
+    assert_equal 2, @pt.reload.time_index
+    # 却下された案の出来事は作られない
+    assert_equal [], result.events
+    assert_not @pt.world_events.where(time_index: 1, kind: "invited").exists?
+    # rejected に理由が出る（判断した住民ごとに1件）
+    assert_equal 2, responder.calls
+    assert_equal 2, result.rejected.size
+    result.rejected.each do |rejected|
+      assert_equal "invite", rejected[:action_type]
+      assert_includes rejected[:errors], "target がその場にいる相手ではない"
+    end
+    # 呼び出しの利用記録は残り、費用も数える（反映済みの扱い。採用か却下かは AiCall では区別しない）
+    calls = AiCall.where(time_slot_run: slot_run).order(:id)
+    assert_equal [ [ "decision", "succeeded", "applied", 1 ] ] * 2, calls.map { _1.values_at(:purpose, :status, :applied, :attempt) }
+    assert calls.all? { _1.actual_cost_micro_yen.positive? }
+    assert_equal calls.sum(:actual_cost_micro_yen), AiBudget.default.month!.spent_micro_yen
   end
 end
