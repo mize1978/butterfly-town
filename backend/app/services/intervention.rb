@@ -1,7 +1,7 @@
 # 特殊介入（#33）。A と B を合わせて1プレイ3回まで（Playthrough::INTERVENTIONS・DB の CHECK）。
 #   rumor（うわさを流す）：選んだ住民に、カタログの事実（e1・e2）を1つ知らせる。知らなければ記憶（source: rumor）になり、
 #     その時間帯にひとりで判断する機会になる。もう知っていても1回消費し、出来事も残す（答えは同じにして、記憶を漏らさない）
-#   gathering（集まる場を作る）：選んだ場所で、次の朝か昼に集まりを開くと告知する。住民全員がその時間帯に判断する機会を得る。
+#   gathering（集まる場を作る）：選んだ場所（広場・店）で、次の朝か昼に集まりを開くと告知する。住民全員がその時間帯に判断する機会を得る。
 #     行くかどうかは住民が選ぶ。開かれた時間帯に、その場所にいた住民を TimeSlotProcessor が記録する
 #
 # どちらも住民の行動は決めない。住民の場所・移動の予定・作業・進み具合は、次の判断まで変わらない。
@@ -9,6 +9,8 @@
 # 出来事の command_id は request_id から作るので、同じ送信を2回受けても1回分になる（中身が違えば断る）
 class Intervention
   KINDS = %w[rumor gathering].freeze
+  # 集まりを開ける場所。画面（frontend/src/game/intervention.ts の GATHERING_PLACES）と同じ。家は選べない
+  GATHERING_PLACES = %w[plaza shop].freeze
   Result = Struct.new(:status, :event, :error, keyword_init: true)
 
   def initialize(playthrough) = @playthrough = playthrough
@@ -43,7 +45,7 @@ class Intervention
       return "invalid_target" unless ResidentCatalog.keys.include?(request["target"])
       return "invalid_fact" unless ResidentCatalog.data.fetch("facts").key?(request["fact_key"])
     else
-      return "invalid_place" unless ResidentCatalog.locations.include?(request["place"])
+      return "invalid_place" unless GATHERING_PLACES.include?(request["place"])
     end
     nil
   end

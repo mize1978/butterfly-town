@@ -9,12 +9,19 @@ export const FACTS = [
 export const RESIDENTS = ["a", "b", "c"] as const;
 export const GATHERING_PLACES = [{ key: "plaza", label: "広場" }, { key: "shop", label: "店" }] as const;
 
-// 介入できない理由（押せないときに添える文）。できるなら null
-export function interventionBlocked(s: PlaythroughState, sending: boolean): string | null {
+// 介入できない理由（押せないときに添える文）。できるなら null。
+// 時間帯を進めている間（slotSending）も押せない（2つの応答が前後して、古い状態が画面に残らないようにする）
+export function interventionBlocked(s: PlaythroughState, sending: boolean, slotSending = false): string | null {
   if (s.status === "finished") return "15の時間帯が終わったので、介入はできません。";
   if (s.interventionsLeft <= 0) return "介入はもう使えません（1プレイ3回まで）。";
   if (sending) return "送っています…";
+  if (slotSending) return "時間帯を進めている途中です。";
   return null;
+}
+
+// 「時間帯を進める」を押せないとき：終わった街・進めている途中・介入を送っている途中
+export function slotAdvanceBlocked(v: { finished: boolean; slotSending: boolean; intervening: boolean }): boolean {
+  return v.finished || v.slotSending || v.intervening;
 }
 
 // 断られたときの案内。adopt：Rails の状態（残り回数など）に画面を合わせる。どれも回数は使っていない

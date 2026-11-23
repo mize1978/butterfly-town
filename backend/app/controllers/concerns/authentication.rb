@@ -3,10 +3,11 @@
 # 期限は最後に使ってから Session::TTL（30日）。使うたびに DB の行と Cookie の期限を延ばす。
 # ゲストの Cookie（guest_token・GuestSession）とは別に持ち、ログイン・ログアウトしてもゲストの街はそのまま残す。
 # いまはログインが必要な API が無いので、ログインを必須にする before_action は付けない。
-# 登録・ログイン・ログアウトは、他サイトからの要求を拒否する（reject_cross_site_request）
+# 登録・ログイン・ログアウトは、他サイトからの要求を拒否する（reject_cross_site_request。中身は SameOriginRequest）
 module Authentication
   extend ActiveSupport::Concern
   include ActionController::Cookies
+  include SameOriginRequest
 
   COOKIE = :session_id
 
@@ -50,30 +51,6 @@ module Authentication
     resume_session&.destroy
     Current.session = nil
     cookies.delete(COOKIE)
-  end
-
-  # 他サイトからの登録・ログイン・ログアウトを拒否する（login CSRF の対策）。
-  # 正規の画面は同じオリジンから JSON で送る。他サイトのフォームは JSON を送れず、他サイトの fetch で JSON を送るには
-  # CORS の許可が要る（このアプリは CORS を許可していない）。さらに、ブラウザが付ける Sec-Fetch-Site が同じオリジン以外を示すか、
-  # Sec-Fetch-Site の無い古いブラウザで Origin が別のサイトなら拒否する
-  def reject_cross_site_request
-    return if same_origin_json_request?
-
-    # どのチェックで拒否したかを残す（値はブラウザが付けたヘッダーと、Rails が自分の URL とみなしたものだけ）
-    Rails.logger.warn("[auth] cross_site_request rejected: media_type=#{request.media_type.inspect} " \
-                      "sec_fetch_site=#{request.headers['Sec-Fetch-Site'].inspect} origin=#{request.headers['Origin'].inspect} " \
-                      "base_url=#{request.base_url.inspect}")
-    render json: { error: "cross_site_request" }, status: :forbidden
-  end
-
-  def same_origin_json_request?
-    return false unless request.media_type == "application/json"
-
-    site = request.headers["Sec-Fetch-Site"]
-    return %w[same-origin none].include?(site) if site.present?
-
-    origin = request.headers["Origin"]
-    origin.blank? || origin == request.base_url
   end
 
   # 本番の経路の確認用（#35）。Rails に直接つながる中継（REMOTE_ADDR）と、転送ヘッダーの各段の「種類」と「位置」、

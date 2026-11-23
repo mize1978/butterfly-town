@@ -3,9 +3,13 @@ module Api
     # POST /api/v1/playthrough/interventions  特殊介入（#33）。受け付けと結果の返却だけを行い、処理は Intervention に任せる。
     #   { kind: "rumor", request_id:, target: "a", fact_key: "e2" }  うわさを流す
     #   { kind: "gathering", request_id:, place: "plaza" }           集まる場を作る
-    # 成立 201・同じ送信の再送 200（どちらも state と出来事）。断ったとき 409（error と state）。入力の誤り 422
+    # 成立 201・同じ送信の再送 200（どちらも state と出来事）。断ったとき 409（error と state）。入力の誤り 422。
+    # 他サイトからの送信は、登録・ログインと同じく 403 で拒否する（SameOriginRequest）
     class InterventionsController < ApplicationController
       include GuestSession
+      include SameOriginRequest
+
+      before_action :reject_cross_site_request
 
       STATUS = { applied: :created, already_applied: :ok, conflict: :conflict, invalid: :unprocessable_content }.freeze
 

@@ -21,6 +21,7 @@ import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
 import { InterventionPanel } from "./InterventionPanel";
+import { slotAdvanceBlocked } from "../game/intervention";
 import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
 
 // 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
@@ -72,6 +73,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const [stop, setStop] = useState<BudgetStop | null>(null); // 予算不足で止めたときの中断の案内（S22 の最小版）
   const [budgetPending, setBudgetPending] = useState(false); // 予算不足の案内をまだ見てもらっていない（別の画面を開いていた）
   const slotButton = useRef<HTMLButtonElement>(null);
+  const [intervening, setIntervening] = useState(false); // 特殊介入（#33）を送っている間は、時間帯を進めない
 
   useEffect(() => {
     const ac = new AbortController();
@@ -147,7 +149,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   // 通信に失敗したら、同じ時間帯をもう一度送れる（届いていた場合も Rails が確定済みとして同じ出来事を返し、二重には進まない）
   const finished = playthrough?.status === "finished";
   const advance = async () => {
-    if (!playthrough || finished) return;
+    if (!playthrough || slotAdvanceBlocked({ finished, slotSending: slot.sending, intervening })) return;
     setSlot((v) => ({ ...v, sending: true, error: null, note: null }));
     setBudgetPending(false);
     try {
@@ -204,12 +206,12 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
               </div>
               {playthrough && (
                 <div className="slot-bar">
-                  <button type="button" ref={slotButton} className="btn slot-button" disabled={slot.sending || finished} aria-describedby="slot-result" onClick={advance}>
+                  <button type="button" ref={slotButton} className="btn slot-button" disabled={slotAdvanceBlocked({ finished, slotSending: slot.sending, intervening })} aria-describedby="slot-result" onClick={advance}>
                     {slot.sending ? "進めています…" : finished ? "時間帯は終わりました" : slot.error ? "もう一度送る" : "時間帯を進める"}
                     {!finished && <small>{nextStepLabel(playthrough)}</small>}
                   </button>
-                  <InterventionPanel playthrough={playthrough} disabled={slot.sending} onPlaythroughChange={onPlaythroughChange}
-                    onDone={(text) => setSlot((v) => ({ ...v, error: null, note: text }))} />
+                  <InterventionPanel playthrough={playthrough} slotSending={slot.sending} onPlaythroughChange={onPlaythroughChange}
+                    onDone={(text) => setSlot((v) => ({ ...v, error: null, note: text }))} onSendingChange={setIntervening} />
                   <div id="slot-result" className="slot-result" aria-live="polite">
                     {slot.error && <p className="slot-error" role="alert">{slot.error}。「もう一度送る」で同じ時間帯を送り直します（二重には進みません）。</p>}
                     {slot.note && <p className="slot-note">{slot.note}</p>}

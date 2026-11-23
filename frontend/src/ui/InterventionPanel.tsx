@@ -1,14 +1,19 @@
 // 特殊介入（#33）のパネル。「時間帯を進める」の横の「介入」から開く。
-// 残り回数を出し、0 回・終わった街では押せない（理由を添える）。断られたら回数は使っていないことを伝える
+// 残り回数を出し、0 回・終わった街では押せない（理由を添える）。断られたら回数は使っていないことを伝える。
+// 時間帯を進めている間（slotSending）は「介入」「介入する」とも押せない。送っている間は onSendingChange で親に伝え、
+// 親は「時間帯を進める」を押せなくする（2つの応答が前後して古い状態を画面に反映しないため）
 import { useMemo, useState } from "react";
 import type { PlaythroughState } from "../api/playthrough";
 import { sendIntervention, type InterventionRequest } from "../api/interventions";
 import { FACTS, GATHERING_PLACES, InterventionRequestId, interventionBlocked, interventionNote, RESIDENTS } from "../game/intervention";
 import { describeEvent } from "../game/time-slot";
 
-type Props = { playthrough: PlaythroughState; disabled: boolean; onPlaythroughChange: (s: PlaythroughState) => void; onDone: (text: string) => void };
+type Props = {
+  playthrough: PlaythroughState; slotSending: boolean;
+  onPlaythroughChange: (s: PlaythroughState) => void; onDone: (text: string) => void; onSendingChange: (sending: boolean) => void;
+};
 
-export function InterventionPanel({ playthrough, disabled, onPlaythroughChange, onDone }: Props) {
+export function InterventionPanel({ playthrough, slotSending, onPlaythroughChange, onDone, onSendingChange }: Props) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<"rumor" | "gathering">("rumor");
   const [target, setTarget] = useState<string>("a");
@@ -17,13 +22,15 @@ export function InterventionPanel({ playthrough, disabled, onPlaythroughChange, 
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const ids = useMemo(() => new InterventionRequestId(), []);
-  const blocked = interventionBlocked(playthrough, sending);
+  const blocked = interventionBlocked(playthrough, sending, slotSending);
 
   const submit = async () => {
     const content = kind === "rumor" ? `rumor:${target}:${factKey}` : `gathering:${place}`;
     const requestId = ids.for(content);
     const req: InterventionRequest = kind === "rumor" ? { kind, requestId, target, factKey } : { kind, requestId, place };
+    if (blocked) return;
     setSending(true);
+    onSendingChange(true);
     setMessage(null);
     try {
       const r = await sendIntervention(req);
@@ -34,16 +41,17 @@ export function InterventionPanel({ playthrough, disabled, onPlaythroughChange, 
       setMessage(`${(e as Error).message}。もう一度押すと同じ介入を送り直します（二重には数えません）。`);
     } finally {
       setSending(false);
+      onSendingChange(false);
     }
   };
 
   return (
     <div className="intervention">
       <button type="button" className="btn intervention-button" aria-expanded={open} aria-controls="intervention-panel"
-        disabled={disabled || (!open && blocked !== null && !sending)} onClick={() => setOpen((o) => !o)}>
+        disabled={slotSending || (!open && blocked !== null && !sending)} onClick={() => setOpen((o) => !o)}>
         介入<small>残り{playthrough.interventionsLeft}回</small>
       </button>
-      {blocked && !sending && !open && <span className="slot-note intervention-why">{blocked}</span>}
+      {blocked && !sending && !slotSending && !open && <span className="slot-note intervention-why">{blocked}</span>}
       {open && (
         <div id="intervention-panel" className="intervention-panel" role="group" aria-label="特殊介入">
           <fieldset>
