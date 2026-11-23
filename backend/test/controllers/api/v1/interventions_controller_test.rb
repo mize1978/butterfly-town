@@ -25,6 +25,29 @@ class Api::V1::InterventionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 2, body.dig("state", "interventions_left")
   end
 
+  test "他サイトからの送信（JSON でない・ブラウザが他サイトと示す・別の Origin）は 403 で、街の状態を変えない。正規の画面からは通る" do
+    post api_v1_playthrough_path
+    pt = Playthrough.last
+    before = -> { pt.reload.attributes.slice("interventions_used", "state_version").merge("events" => pt.world_events.count) }
+    snapshot = before.call
+    params = { kind: "gathering", request_id: "x-1", place: "plaza" }
+
+    post api_v1_playthrough_interventions_path, params: params # 他サイトのフォーム（JSON でない）
+    assert_response :forbidden
+    assert_equal "cross_site_request", body["error"]
+    %w[cross-site same-site].each do |site|
+      post api_v1_playthrough_interventions_path, params: params, headers: { "Sec-Fetch-Site" => site }, as: :json
+      assert_response :forbidden
+    end
+    post api_v1_playthrough_interventions_path, params: params, headers: { "Origin" => "https://evil.example" }, as: :json
+    assert_response :forbidden
+    assert_equal snapshot, before.call
+
+    post api_v1_playthrough_interventions_path, params: params,
+                                               headers: { "Sec-Fetch-Site" => "same-origin", "Origin" => "http://www.example.com" }, as: :json
+    assert_response :created
+  end
+
   test "4回目は 409 no_interventions_left で、残り0の状態を返す。入力の誤りは 422" do
     post api_v1_playthrough_path
     3.times { intervene(kind: "rumor", request_id: "r-#{_1}", target: "a", fact_key: "e1") }

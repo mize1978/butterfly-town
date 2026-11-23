@@ -78,6 +78,15 @@ class InterventionTest < ActiveSupport::TestCase
     assert_equal [ :conflict, "too_late" ], gathering("night").to_h.values_at(:status, :error)
   end
 
+  test "集まりの場所は広場と店だけ。家（API で直接指定しても）は invalid_place で、回数も出来事も変えない" do
+    before = snapshot
+    %w[home_a home_b home_c].each do |home|
+      assert_equal [ :invalid, "invalid_place" ], gathering("g-#{home}", place: home).to_h.values_at(:status, :error), home
+    end
+    assert_equal before, snapshot
+    assert_equal :applied, gathering("g-shop", place: "shop").status
+  end
+
   test "終わった街・入力の誤りは、回数を消費せずに断る" do
     before = snapshot
     { { kind: "magic", request_id: "x" } => "invalid_kind",
