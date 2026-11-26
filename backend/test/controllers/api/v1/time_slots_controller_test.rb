@@ -22,6 +22,42 @@ class Api::V1::TimeSlotsControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ %w[consulted a c], %w[told c a] ], body.dig("time_slot", "events").map { _1.values_at("kind", "actor_key", "target_key") }.sort
   end
 
+  # #31：応答の time_index（次に進める時間帯）と、住民の場所をそろえる。画面はこの場所をそのまま描く
+  def residents_in_state = body.dig("state", "residents").to_h { _1.values_at("key", "location_key") }
+
+  test "朝を確定して昼に切り替わった直後の応答では、住民は昼の日課の場所にいる" do
+    post api_v1_playthrough_path
+    confirm(0)
+    assert_response :ok
+    assert_equal 1, body.dig("state", "time_index")
+    assert_equal({ "a" => "plaza", "b" => "shop", "c" => "plaza" }, residents_in_state)
+  end
+
+  test "昼を確定して夜に切り替わった直後の応答では、住民は全員家にいる" do
+    post api_v1_playthrough_path
+    confirm(0)
+    confirm(1)
+    assert_response :ok
+    assert_equal 2, body.dig("state", "time_index")
+    assert_equal({ "a" => "home_a", "b" => "home_b", "c" => "home_c" }, residents_in_state)
+  end
+
+  test "夜に移動を決めて翌朝に切り替わった直後の応答では、移動の予定（A は店）が反映されている" do
+    post api_v1_playthrough_path
+    (0..2).each { confirm(_1) }
+    assert_response :ok
+    assert_equal [ "moved" ], body.dig("time_slot", "events").select { _1["actor_key"] == "a" }.map { _1["kind"] }
+    assert_equal 3, body.dig("state", "time_index")
+    assert_equal({ "a" => "shop", "b" => "home_b", "c" => "shop" }, residents_in_state)
+  end
+
+  test "GET でも、いまの時間帯の場所を返す（確定の応答と同じ）" do
+    post api_v1_playthrough_path
+    confirm(0)
+    get api_v1_playthrough_path
+    assert_equal({ "a" => "plaza", "b" => "shop", "c" => "plaza" }, response.parsed_body["residents"].to_h { _1.values_at("key", "location_key") })
+  end
+
   test "同じ時間帯を2回送ると、2回目は確定済みとして同じ出来事を返し、増やさない" do
     post api_v1_playthrough_path
     confirm(0)
