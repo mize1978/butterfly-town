@@ -3,6 +3,7 @@ import { TOWN } from "../test/town";
 import { allowed } from "../core/world";
 import { SAMPLE_RESIDENT, TALK_RANGE } from "./sample-resident";
 import { RESUME_GUARD, Session } from "./session";
+import { SHOP } from "./errand";
 
 const run = (s: Session, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.tick(dt); };
 const east = { x: TOWN.spawn.x + 300, y: TOWN.spawn.y };
@@ -182,5 +183,53 @@ describe("会話やメニューを閉じた直後の入力（閉じるボタン�
     s.goTo(east);
     run(s, 0.5);
     expect(s.sim.pos.x).toBeGreaterThan(x);
+  });
+});
+
+// #31：仮の住民1人を、Rails が返した3人に置き換える。場所が変わったら（時間帯を進めたら）置き直す
+describe("街の3人の住民（setResidents）", () => {
+  const near = { x: TOWN.spawn.x + 50, y: TOWN.spawn.y };
+  const away = { x: TOWN.spawn.x + 400, y: TOWN.spawn.y };
+  const resident = (key: string, pos: { x: number; y: number }) => ({ key, name: `住民${key}`, pos });
+  const ids = (s: Session) => s.spots().map((x) => x.id).filter((id) => id.startsWith("resident"));
+
+  it("受け取った住民だけが話せる場所になり、id は住民ごとに分かれる", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("a", away), resident("b", near)]);
+    expect(ids(s)).toEqual(["resident-a", "resident-b"]);
+    s.setResidents([]);
+    expect(ids(s)).toEqual([]);
+  });
+
+  it("近くの住民をタップすると、その住民の会話を開く", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("a", away), resident("b", near)]);
+    const opened: string[] = [];
+    s.onOpen = (id) => opened.push(id);
+    expect(s.nearSpot).toBe("resident-b");
+    expect(s.tapSpot({ x: near.x, y: near.y - 100 })).toBe(true);
+    expect(opened).toEqual(["resident-b"]);
+  });
+
+  it("近くにいた住民が別の場所へ移ったら、話せる相手と選択から外れる", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("b", near)]);
+    expect(s.nearSpot).toBe("resident-b");
+    s.setResidents([resident("b", away)]);
+    expect(s.nearSpot).toBeNull();
+    expect(s.selectedSpot).toBeNull();
+  });
+
+  it("店先に3人いても、店の絵と住民をそれぞれタップで選べる", () => {
+    const s = new Session(TOWN);
+    const stands = TOWN.places?.shop?.stands ?? [];
+    expect(stands).toHaveLength(3);
+    s.setResidents(["a", "b", "c"].map((k, i) => resident(k, stands[i])));
+    expect(s.tapSpot({ x: SHOP.pos.x, y: SHOP.pos.y - 140 })).toBe(true);
+    expect(s.selectedSpot).toBe("shop");
+    ["a", "b", "c"].forEach((k, i) => {
+      expect(s.tapSpot({ x: stands[i].x, y: stands[i].y - 100 })).toBe(true);
+      expect(s.selectedSpot).toBe(`resident-${k}`);
+    });
   });
 });

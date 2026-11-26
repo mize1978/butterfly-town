@@ -13,13 +13,25 @@ describe("街の地図の検証（parseTown）", () => {
     expect(t.walkable.length).toBeGreaterThanOrEqual(3);
   });
 
+  // #31：住民の場所の立ち位置（places）と、街の絵の外の場所（offstage）
+  it("住民の場所ごとの立ち位置と、街の絵の外の場所を受け取れる", () => {
+    const t = parseTown(festival);
+    expect(Object.keys(t.places ?? {}).sort()).toEqual(["plaza", "shop"]);
+    expect(t.places?.shop.name).toBe("店");
+    expect(t.places?.plaza.name).toBe("広場");
+    expect(t.offstage).toEqual({ home_a: "家", home_b: "家", home_c: "家" });
+  });
+
   it.each([
     ["オブジェクトでない", () => [1, 2]],
     ["歩ける範囲が2点しかない", () => ({ ...clone(), walkable: [[0, 0], [1, 1]] })],
     ["座標が数値でない", () => ({ ...clone(), foreground: [[0, 0], ["a", 1], [2, 2]] })],
     ["大きさが0", () => ({ ...clone(), size: { width: 0, height: 1024 } })],
     ["出現位置が無い", () => { const b = clone(); delete b.spawn; return b; }],
-    ["出現位置が歩ける範囲の外", () => ({ ...clone(), spawn: { x: 10, y: 10 } })]
+    ["出現位置が歩ける範囲の外", () => ({ ...clone(), spawn: { x: 10, y: 10 } })],
+    ["立ち位置（places）が無い", () => { const b = clone(); delete b.places; return b; }],
+    ["立ち位置が歩ける範囲の外", () => ({ ...clone(), places: { plaza: { name: "広場", stands: [{ x: 10, y: 10 }] } } })],
+    ["街の絵の外の場所（offstage）の呼び方が文字列でない", () => ({ ...clone(), offstage: { home_a: 1 } })]
   ])("%s 地図は描画の前に失敗にする", (_name, body) => {
     expect(() => parseTown(body())).toThrow(TownLoadError);
   });
