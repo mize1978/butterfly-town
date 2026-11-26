@@ -55,7 +55,8 @@ class InviteReplyScenarioTest < ActiveSupport::TestCase
       assert_equal :confirmed, result.status, "時間帯#{t}"
       actual_events[t] = summarize(result.events)
       actual_rejected[t] = result.rejected.map { "#{_1[:actor_key]}:#{_1[:action_type]}" }
-      assert_equal EXPECTED_A_LOCATION[t], location("a"), "時間帯#{t}の A の場所" if EXPECTED_A_LOCATION.key?(t)
+      # 確定したら、次の時間帯の場所へ動いている（#31）
+      assert_equal EXPECTED_A_LOCATION[t + 1], location("a"), "時間帯#{t}を確定した後（時間帯#{t + 1}）の A の場所" if EXPECTED_A_LOCATION.key?(t + 1)
 
       before = counts
       again = TimeSlotProcessor.new(@pt, responder: recorder).call(time_index: t)

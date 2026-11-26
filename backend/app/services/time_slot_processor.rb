@@ -11,6 +11,7 @@
 # 伝える行動が成立したときだけ、受け手の記憶を作る（#9）。
 # 返事（#55）は accepted / declined の出来事だけを残す（記憶・進み具合・関係値は変えない）。
 # 移動（#55）は出来事と移動の予定（residents.current_plan）を残し、次の朝か昼から反映する。
+# 確定したら、次の時間帯の場所（日課と移動の予定）へ住民を動かしてから返す（#31）。state に見える場所＝次の判断で使う場所
 # 特殊介入の集まり（#33）が開かれる時間帯には、その場所にいた住民を参加者として記録する（行動は決めない）
 #
 # 費用のかかる応答（実LLM。billable? が true のもの）は、呼ぶ前に AiBudget で予約する（#10）。
@@ -173,8 +174,9 @@ class TimeSlotProcessor
         learn!(resident, event) if kind == "told"
         plan_move!(resident, proposal, time_index) if kind == "moved"
       end
-      @playthrough.state_version += 1 if changed || events.any?
       finish_slot(time_index)
+      changed = arrive(time_index + 1) || changed unless @playthrough.status == "finished"
+      @playthrough.state_version += 1 if changed || events.any?
       @playthrough.save!
       run.update!(status: "confirmed")
       mark_calls(run, attempt, "applied")
@@ -182,6 +184,16 @@ class TimeSlotProcessor
     end
   end
 
+  # 次の時間帯へ進んだら、その時間帯の場所（日課と、いま決まった分も含む移動の予定）へ住民を動かす（#31）。
+  # 画面（state の residents）に見える場所と、次に確定するときの判断・集まりで使う場所をそろえる。
+  # 移動の予定はこの時間帯の判断で別の行（resident）に保存したので、読み直してから求める
+  def arrive(next_index)
+    @playthrough.residents.reset
+    move(routine_locations(next_index))
+  end
+
+  # 確定する時間帯の場所へ動かす。ふつうは前の確定（arrive）で動かし済みなので変わらない。
+  # この変更（#31）より前に始めた街の、最初の1時間帯だけ、ここで場所が追いつく
   def move(locations)
     @playthrough.residents.reject { locations.fetch(_1.key) == _1.location_key }
                 .each { _1.update!(location_key: locations.fetch(_1.key)) }.any?
