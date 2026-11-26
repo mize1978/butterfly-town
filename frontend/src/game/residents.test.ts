@@ -101,6 +101,15 @@ describe("実際の地図の立ち位置", () => {
     for (const p of stands) expect(overlaps(body(p), shopBox), `(${p.x}, ${p.y})`).toBe(false);
   });
 
+  // 店と広場には同時に住民がいる（例：朝は a が広場・c が店）ので、場所をまたいでも重ならない
+  it("店と広場の立ち位置は、場所をまたいでもタップの範囲（体）が重ならない", () => {
+    const all = Object.entries(TOWN.places ?? {}).flatMap(([key, p]) => p.stands.map((s, i) => ({ id: `${key}${i}`, s })));
+    expect(all).toHaveLength(6);
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) expect(overlaps(body(all[i].s), body(all[j].s)), `${all[i].id}と${all[j].id}`).toBe(false);
+    }
+  });
+
   it("家（home_a・home_b・home_c）は街の絵の外として持つ", () => {
     expect(TOWN.offstage).toEqual({ home_a: "家", home_b: "家", home_c: "家" });
   });

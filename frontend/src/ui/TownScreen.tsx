@@ -9,31 +9,35 @@ import type { TimeSlot } from "../api/time-slot";
 import { fetchTown } from "../api/town";
 import type { Town } from "../core/world";
 import { Session } from "../game/session";
-import { accept, collect, PART_IDS, START, partFind, partOfSpot, PARTS, SHOP, shopReply, type PartSpotId, type Repair, type SpotId } from "../game/errand";
+import { accept, collect, isResidentSpot, PART_IDS, START, partFind, partOfSpot, PARTS, SHOP, shopReply, type PartSpotId, type Repair, type ResidentSpotId, type SpotId } from "../game/errand";
+import { awayLine, placeResidents, talkTitle } from "../game/residents";
 import { RepairBench } from "./RepairBench";
 import { RepairBenchTouch } from "./RepairBenchTouch";
 
 // 作業台の比べ方：URL に ?bench=new を付けると「触れる見本」、付けなければ従来の作業台（同じ端末で切り替えて比べる）
 const BENCH_NEW = new URLSearchParams(window.location.search).get("bench") === "new";
 import { ConversationView } from "./ConversationView";
+import { SAMPLE_RESIDENT } from "../game/sample-resident";
 import { Frame } from "./Frame";
 import { GameView } from "./GameView";
 import { TownMenu } from "./TownMenu";
 import { PHONE_QUERY } from "../game/view-size";
 import { InterventionPanel } from "./InterventionPanel";
 import { slotAdvanceBlocked } from "../game/intervention";
-import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, type BudgetStop } from "../game/time-slot";
+import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, statusLabel, type BudgetStop } from "../game/time-slot";
 
 // 時間帯を進めた結果の表示。error：通信・HTTP の失敗（同じ時間帯をもう一度送れる）。note：409 の案内。last：直前に確定した時間帯の出来事
 type SlotView = { sending: boolean; error: string | null; note: string | null; last: TimeSlot | null };
 const SLOT_IDLE: SlotView = { sending: false, error: null, note: null, last: null };
 
 type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; town: Town };
-type Overlay = null | "menu" | "talk" | "shop" | "bench" | "budget" | PartSpotId;
-const opens = (id: SpotId): Overlay => (id === "resident" ? "talk" : id);
+// 住民との会話は、話している住民の id（resident-a など）で持つ
+type Overlay = null | "menu" | "shop" | "bench" | "budget" | PartSpotId | ResidentSpotId;
+const opens = (id: SpotId): Overlay => id;
 const FAR_NOTE_MS = 2500; // 遠くをタップしたときの案内を出しておく時間
-const FRAME_LABEL: Record<"menu" | "talk" | "shop" | "bench" | "budget", string> = { menu: "街・徒歩", talk: "住民との会話", shop: "スクーター修理・依頼", bench: "作業台・修理", budget: "中断" };
-const frameLabel = (o: Exclude<Overlay, null>) => (partOfSpot(o as SpotId) ? "部品の発見" : FRAME_LABEL[o as keyof typeof FRAME_LABEL]);
+const FRAME_LABEL: Record<"menu" | "shop" | "bench" | "budget", string> = { menu: "街・徒歩", shop: "スクーター修理・依頼", bench: "作業台・修理", budget: "中断" };
+const frameLabel = (o: Exclude<Overlay, null>) =>
+  (isResidentSpot(o as SpotId) ? "住民との会話" : partOfSpot(o as SpotId) ? "部品の発見" : FRAME_LABEL[o as keyof typeof FRAME_LABEL]);
 
 // 依頼の進み具合の札（受ける前は出さない）
 function errandBadge(r: Repair): string | null {
@@ -99,6 +103,11 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
     if (overlay) session.pause(); else session.resume();
   }, [overlay, session]);
 
+  // 住民（#31）：Rails が確定した場所（playthrough.residents）に置く。時間帯を進めて状態が変わったら置き直す。
+  // 家にいる住民と、地図に無い場所の住民は街の絵に描かず、情報欄に出す
+  const placed = useMemo(() => (town && playthrough ? placeResidents(town, playthrough.residents) : null), [town, playthrough]);
+  useEffect(() => { if (session) session.setResidents(placed?.onMap ?? []); }, [session, placed]);
+
   // スマホ：近くの住民・スクーター修理・部品をタップすると、その会話・発見の画面をすぐ開く（確定の操作は開いた画面の中）
   useEffect(() => {
     if (!session) return;
@@ -124,7 +133,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   }, [session, overlay]);
 
   // 近くの場所の名前と、できること（部品は「調べる」、住民とスクーター修理は「話す」）
-  const nameOf = (id: SpotId) => { const p = partOfSpot(id); return p ? PARTS[p].name : id === "shop" ? SHOP.name : session?.resident.name ?? ""; };
+  const nameOf = (id: SpotId) => { const p = partOfSpot(id); return p ? PARTS[p].name : id === "shop" ? SHOP.name : isResidentSpot(id) ? session?.residentOf(id)?.name ?? "" : ""; };
   const isPart = (id: SpotId | null) => !!id && !!partOfSpot(id);
   const verb = (id: SpotId | null) => (isPart(id) ? "調べる" : "話す");
   const canDo = (id: SpotId) => `${nameOf(id)}${isPart(id) ? "を調べられます" : "と話せます"}`;
@@ -134,6 +143,7 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
   const badge = errandBadge(repair);
   const reply = shopReply(repair);
   const partOpen = overlay ? partOfSpot(overlay as SpotId) : null;
+  const talking = overlay && isResidentSpot(overlay as SpotId) ? session?.residentOf(overlay as ResidentSpotId) ?? null : null;
 
   // 会話は何も重ねていないときだけ開く（メニューから会話へ切り替わらない）。閉じたら、開いたボタンへフォーカスを戻す。
   // 予算不足の案内を保留していたら、閉じたあとにそれを出す（フォーカスは案内の「街に戻る」へ）
@@ -196,11 +206,8 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
               <div className="town-top">
               <div className="town-info" aria-label="街の情報">
                 <span className="town-name">{session.town.name}</span>
-                {playthrough && (
-                  <span className="badge" aria-label={`時間帯 ${playthrough.timeIndex + 1}／${playthrough.timeSlots}、特殊介入の残り ${playthrough.interventionsLeft}回`}>
-                    時間帯 {playthrough.timeIndex + 1}/{playthrough.timeSlots}・介入 残り{playthrough.interventionsLeft}
-                  </span>
-                )}
+                {playthrough && <span className="badge town-status">{statusLabel(playthrough)}</span>}
+                {placed?.away.map((r) => <span key={r.key} className="badge resident-away">{awayLine(r)}</span>)}
                 <span className="badge">ゲスト・位置と修理は保存なし</span>
                 {badge && <span className="badge errand-badge" aria-live="polite">{badge}</span>}
               </div>
@@ -243,16 +250,17 @@ export function TownScreen({ playthrough, onPlaythroughChange, onExitToTitle }: 
                     {verb(near)} →
                   </button>
                   <p className="hint" id="talk-hint">
-                    {selected && near !== selected ? `${approach(selected)}。` : near ? `${canDo(near)}。` : `${session.resident.name}やスクーター修理に近づくと話せます。`}
+                    {selected && near !== selected ? `${approach(selected)}。` : near ? `${canDo(near)}。` : "住民やスクーター修理に近づくと話せます。"}
                     行きたい場所をクリックすると歩きます（長押しで歩き続けます）。
                   </p>
                 </div>
               )}
             </div>
             {overlay === "menu" && <TownMenu onClose={() => close(menuButton)} onExitToTitle={onExitToTitle} />}
-            {overlay === "talk" && (
-              <ConversationView title={`${session.resident.name}との会話`} speaker={session.resident.name} badge="サンプル会話・AI未接続"
-                lines={session.resident.lines} onClose={() => close(talkButton)} />
+            {talking && (
+              // 話題を選ぶ会話は #32。それまでは、どの住民でも同じサンプル会話を出す（選んだ住民の名前と、サンプルであることを出す）
+              <ConversationView title={talkTitle(talking.name)} speaker={talking.name} badge="サンプル会話・AI未接続"
+                lines={SAMPLE_RESIDENT.lines} onClose={() => close(talkButton)} />
             )}
             {overlay === "shop" && (
               // 返答は依頼の状態ごとに変わる。受けると、同じウィンドウで次の状態の返答を最初から出す（key で作り直す）。

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import festival from "../../../backend/config/towns/festival-street.json";
 import { parseTown } from "../api/town";
 import { talkSpot } from "../game/approach";
+import { isResidentSpot } from "../game/errand";
+import { SAMPLE_RESIDENT } from "../game/sample-resident";
 import { Session } from "../game/session";
 import { PhaserTown } from "../render/PhaserTown";
 import { dialogKeys } from "./dialog";
@@ -10,8 +12,10 @@ import { dialogKeys } from "./dialog";
 // スクーター修理の店先は目立つので、押したら（近くても遠くても）本編で遊べることだけを短く返す
 const SHOP_NOTE = "修理の遊びは本編で体験できます";
 const TYPE_MS = 45; // 1文字を出す間隔
+// この見本に置く住民は、仮の住民1人だけ（本編の3人とは別）
+const R = SAMPLE_RESIDENT;
 export function EncounterDemo() {
-  const [session] = useState(() => new Session(parseTown(festival)));
+  const [session] = useState(() => new Session(parseTown(festival), [{ key: "sample", name: R.name, pos: R.pos }]));
   const host = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -26,7 +30,7 @@ export function EncounterDemo() {
   const near = useSyncExternalStore(session.subscribe, () => session.nearResident);
   const selected = useSyncExternalStore(session.subscribe, () => session.selectedSpot);
   const walked = useSyncExternalStore(session.subscribe, () => session.hasWalked);
-  const lines = session.resident.lines;
+  const lines = R.lines;
   const last = line === lines.length - 1;
   const [shown, setShown] = useState(0); // いまの文で表示している文字数（1文字ずつ出す）
   const typing = talking && shown < lines[line].text.length;
@@ -50,7 +54,7 @@ export function EncounterDemo() {
   function openTalk() {
     returnFocus.current = document.activeElement instanceof HTMLButtonElement ? document.activeElement : host.current;
     session.pause();
-    session.sim.faceToward(session.resident.pos); // 話し始めたら相手の方を向く
+    session.sim.faceToward(R.pos); // 話し始めたら相手の方を向く
     setLine(0);
     setTalking(true);
     setTalkedOnce(true);
@@ -61,7 +65,7 @@ export function EncounterDemo() {
   // 話しかける：重なっていなければその場で向き直って話す。近すぎるときだけ、住民の横の少し離れた位置まで歩いてから話す
   const approach = useRef<{ x: number; y: number } | null>(null);
   function startTalk() {
-    const spot = talkSpot(session.town, session.sim.pos, session.resident.pos);
+    const spot = talkSpot(session.town, session.sim.pos, R.pos);
     if (!spot) { approach.current = null; openTalk(); return; }
     approach.current = spot;
     session.goTo(spot);
@@ -93,7 +97,7 @@ export function EncounterDemo() {
   }, [session]);
 
   useEffect(() => {
-    session.onOpen = (id) => { if (id === "resident") startTalk(); else if (id === "shop") setNotice(SHOP_NOTE); };
+    session.onOpen = (id) => { if (isResidentSpot(id)) startTalk(); else if (id === "shop") setNotice(SHOP_NOTE); };
     return () => { session.onOpen = null; };
   }, [session]);
 
@@ -161,7 +165,7 @@ export function EncounterDemo() {
               最後の文では押しても閉じない（連打で閉じないよう、閉じるのは右上の固定ボタンだけ） */}
           <button className="enc-line" onClick={advance}
             aria-label={typing ? "全文を表示" : last ? "会話はここまで" : "次の文へ"}>
-            <span className="enc-speaker" id="enc-speaker">{lines[line].speaker === "note" ? "案内" : session.resident.name}<small>固定サンプル</small></span>
+            <span className="enc-speaker" id="enc-speaker">{lines[line].speaker === "note" ? "案内" : R.name}<small>固定サンプル</small></span>
             <span className="enc-text" aria-hidden="true">{lines[line].text.slice(0, shown)}{!typing && !last && <i className="enc-more">▾</i>}</span>
           </button>
           <p className="enc-sr" aria-live="polite">{lines[line].text}</p>

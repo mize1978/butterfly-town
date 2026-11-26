@@ -8,6 +8,8 @@ import {
 import { SAMPLE_RESIDENT, TALK_RANGE } from "./sample-resident";
 import { Session } from "./session";
 
+const ONE = { key: "a", name: "住民a", pos: SAMPLE_RESIDENT.pos }; // 住民1人（以前の仮の住民と同じ位置）
+
 const run = (s: Session, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.tick(dt); };
 // 押し続けて歩き、離して止まる
 const walkTo = (s: Session, p: { x: number; y: number }, sec = 5) => { s.press(p); run(s, sec); s.release(); run(s, 0.3); };
@@ -129,9 +131,9 @@ describe("作業台：部品を合う場所にはめる", () => {
 
 describe("街の中で依頼を進める", () => {
   it("店で受け、4つの部品まで歩いて拾い、店へ戻って作業台で直せる", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     expect(s.nearSpot).toBeNull();
-    expect(s.spots().map((p) => p.id)).toEqual(["resident", "shop"]);
+    expect(s.spots().map((p) => p.id)).toEqual(["resident-a", "shop"]);
 
     walkTo(s, atShop);
     expect(s.nearSpot).toBe("shop");
@@ -145,7 +147,7 @@ describe("街の中で依頼を進める", () => {
       expect(s.act((r) => collect(r, id)).ok).toBe(true);
       expect(s.nearSpot).toBeNull(); // 拾った部品は街から消える
     }
-    expect(s.spots().map((p) => p.id)).toEqual(["resident", "shop"]);
+    expect(s.spots().map((p) => p.id)).toEqual(["resident-a", "shop"]);
 
     walkTo(s, TOWN.spawn);
     walkTo(s, atShop);
@@ -156,7 +158,7 @@ describe("街の中で依頼を進める", () => {
   });
 
   it("合わない操作は状態を変えず、知らせもしない", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     let calls = 0;
     s.subscribe(() => calls++);
     expect(s.act((r) => collect(r, "wheel")).ok).toBe(false);
@@ -167,10 +169,10 @@ describe("街の中で依頼を進める", () => {
   });
 
   it("住民のそばでは今までどおり住民と話せる（店や部品と取り違えない）", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     s.act(accept);
     walkTo(s, SAMPLE_RESIDENT.pos, 4);
-    expect(s.nearSpot).toBe("resident");
+    expect(s.nearSpot).toBe("resident-a");
   });
 });
 
@@ -180,7 +182,7 @@ describe("スマホ：近くでタップするとすぐ開き、遠くでは案�
   const opened = (s: Session) => { const ids: string[] = []; s.onOpen = (id) => ids.push(id); return ids; };
 
   it("近くの店（店先・看板の名札）・部品・住民をタップすると、その画面を開き、歩き出さない", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     walkTo(s, atShop);
     const ids = opened(s), at = { ...s.sim.pos };
     const tag = { x: 520, y: 160, w: 120, h: 27 };
@@ -198,14 +200,14 @@ describe("スマホ：近くでタップするとすぐ開き、遠くでは案�
     expect(s.tapSpot(onPart("wheel"))).toBe(true);
     expect(ids).toEqual(["shop", "shop", "part-wheel"]);
 
-    const r = new Session(TOWN), rIds = opened(r);
+    const r = new Session(TOWN, [ONE]), rIds = opened(r);
     walkTo(r, SAMPLE_RESIDENT.pos, 4);
-    expect(r.tapResident({ x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 80 })).toBe(true);
-    expect(rIds).toEqual(["resident"]);
+    expect(r.tapSpot({ x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 80 })).toBe(true);
+    expect(rIds).toEqual(["resident-a"]);
   });
 
   it("遠くでタップすると開かずに選ぶだけ（案内用）で、案内は消せる", () => {
-    const s = new Session(TOWN), ids = opened(s);
+    const s = new Session(TOWN, [ONE]), ids = opened(s);
     expect(s.tapSpot(onShop)).toBe(true);
     expect(ids).toEqual([]);
     expect(s.selectedSpot).toBe("shop");
@@ -215,7 +217,7 @@ describe("スマホ：近くでタップするとすぐ開き、遠くでは案�
   });
 
   it("部品は依頼を受ける前は当たらず、拾うと当たらなくなり、選択も外れる", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     expect(s.tapSpot(onPart("cover"))).toBe(false);
     s.act(accept);
     expect(s.tapSpot(onPart("cover"))).toBe(true);
@@ -226,7 +228,7 @@ describe("スマホ：近くでタップするとすぐ開き、遠くでは案�
   });
 
   it("会話中（止めている間）はタップしても開かない", () => {
-    const s = new Session(TOWN);
+    const s = new Session(TOWN, [ONE]);
     walkTo(s, atShop);
     const ids = opened(s);
     s.pause();
