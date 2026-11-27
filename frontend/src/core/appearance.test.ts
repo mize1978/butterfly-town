@@ -43,6 +43,32 @@ describe("外見の解決（女の子・アイボリー）", () => {
     }
   });
 
+  // 横向きシートのコマ1・3は通過ポーズに描き直した（コマ1＝手前の足、コマ3＝奥の足が体の下を抜ける）ので、4コマ全部で歩く
+  it("横向きに歩くときは、周期（frameDist×4）の中でコマ0→1→2→3と全部のコマを使う", () => {
+    const frames = (dir: Dir) => [0, 16, 32, 48, 64, 80, 96, 112, 128, 160, 192].map((d) => pose(m(dir, true, { gaitDistance: d }), WALK).frame);
+    expect(frames("e")).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2]);
+    expect(frames("w")).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2]);
+  });
+
+  it("横向きの上下動も、ほかの向きと同じ強さ（最も高いところで bob だけ上がる）", () => {
+    // bobOffset が -1（最も高い）になるのは frameDist×1.5 の位置（通過ポーズのコマ1の中央）
+    expect(pose(m("e", true, { gaitDistance: 48 }), WALK).y).toBeCloseTo(200 - WALK.bob, 5);
+    expect(pose(m("e", true, { gaitDistance: 48, speedRatio: 0.5 }), WALK).y).toBeCloseTo(200 - WALK.bob * 0.5, 5);
+  });
+
+  it("斜め・正面のシートは、これまでどおり全部のコマを使い、上下動も弱めない", () => {
+    const frames = (dir: Dir) => Array.from({ length: 16 }, (_, i) => pose(m(dir, true, { gaitDistance: i * 8 }), WALK).frame);
+    expect(frames("se")).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7]);
+    expect(new Set(frames("s"))).toEqual(new Set([0, 1, 2, 3, 4, 5]));
+    for (const dir of ["se", "ne", "s"] as Dir[]) expect(pose(m(dir, true, { gaitDistance: 48 }), WALK).y).toBeCloseTo(200 - WALK.bob, 5);
+  });
+
+  it("横向きで止まるときの下絵（待機姿勢へ替える前）は、接地コマ0か2", () => {
+    for (let d = 0; d < 256; d += 8) {
+      expect([0, 2]).toContain(pose(m("e", false, { gaitDistance: d }), WALK, false).frame);
+    }
+  });
+
   it(`止まった直後の ${SETTLE} 秒は歩行の接地コマから待機姿勢へ重ねて替え、その後は待機姿勢だけ`, () => {
     const at = (stillFor: number) => walkerActors({ ...m("e", false), stillFor }, WALK);
     const mid = at(SETTLE / 2);
