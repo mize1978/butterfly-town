@@ -1,5 +1,5 @@
 // Rails API から街の地図を受け取る。形が想定と違えば、描画を始める前に失敗として扱う
-import { inside, type Poly, type Town } from "../core/world";
+import { allowed, inside, type Place, type Poly, type Town } from "../core/world";
 
 export class TownLoadError extends Error {}
 
@@ -13,18 +13,41 @@ function polygon(v: unknown, name: string): Poly {
   return v as unknown as Poly;
 }
 
+// 住民の場所ごとの立ち位置（#31）。立ち位置は歩ける範囲の中（足元の円まで入る）でなければ失敗にする
+function places(v: unknown, walkable: Poly): Record<string, Place> {
+  if (!isObj(v)) throw new TownLoadError("街の地図の places がオブジェクトではありません");
+  const out: Record<string, Place> = {};
+  for (const [key, p] of Object.entries(v)) {
+    if (!isObj(p) || typeof p.name !== "string" || !Array.isArray(p.stands) || !p.stands.every((s) => isObj(s) && isNum(s.x) && isNum(s.y))) {
+      throw new TownLoadError(`街の地図の places.${key} が正しくありません`);
+    }
+    const stands = (p.stands as { x: number; y: number }[]).map(({ x, y }) => ({ x, y }));
+    if (!stands.every((s) => allowed({ walkable }, s.x, s.y))) throw new TownLoadError(`街の地図の places.${key} の立ち位置が歩ける範囲の外にあります`);
+    out[key] = { name: p.name, stands };
+  }
+  return out;
+}
+
+function offstage(v: unknown): Record<string, string> {
+  if (!isObj(v) || !Object.values(v).every((s) => typeof s === "string")) throw new TownLoadError("街の地図の offstage が正しくありません");
+  return { ...(v as Record<string, string>) };
+}
+
 export function parseTown(body: unknown): Town {
   if (!isObj(body)) throw new TownLoadError("街の地図が JSON のオブジェクトではありません");
   const { id, name, size, background, walkable, foreground, spawn } = body;
   if (typeof id !== "string" || typeof name !== "string" || typeof background !== "string") throw new TownLoadError("街の地図の id・name・background が文字列ではありません");
   if (!isObj(size) || !isNum(size.width) || !isNum(size.height) || size.width <= 0 || size.height <= 0) throw new TownLoadError("街の地図の size が正しくありません");
   if (!isObj(spawn) || !isNum(spawn.x) || !isNum(spawn.y)) throw new TownLoadError("街の地図の spawn が正しくありません");
+  const area = polygon(walkable, "walkable");
   const town: Town = {
     id, name, background,
     size: { width: size.width, height: size.height },
-    walkable: polygon(walkable, "walkable"),
+    walkable: area,
     foreground: polygon(foreground, "foreground"),
-    spawn: { x: spawn.x, y: spawn.y }
+    spawn: { x: spawn.x, y: spawn.y },
+    places: places(body.places, area),
+    offstage: offstage(body.offstage)
   };
   if (!inside(town.spawn.x, town.spawn.y, town.walkable)) throw new TownLoadError("街の地図の spawn が歩ける範囲の外にあります");
   return town;

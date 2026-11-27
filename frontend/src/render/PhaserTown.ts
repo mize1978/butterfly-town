@@ -3,13 +3,14 @@ import Phaser from "phaser";
 import { measuredRects, SPRITE_FILES, WALK_HEIGHT } from "../core/appearance";
 import type { Point } from "../core/world";
 import type { Session, Tags } from "../game/session";
-import { PART_IDS, PARTS, partSpotId, partsInTown, SHOP, type PartId, type Repair, type SpotId } from "../game/errand";
+import { isResidentSpot, PART_IDS, PARTS, partSpotId, partsInTown, residentSpotId, SHOP, type PartId, type Repair, type ResidentSpotId, type SpotId } from "../game/errand";
+import type { PlacedResident } from "../game/residents";
 import { VIEW_SIZE, type ViewSize } from "../core/camera";
 import { PHONE_QUERY, phoneViewSize } from "../game/view-size";
 
 const ART_BASE = "art/";
 
-// 仮の住民（名前のない一般住民）の立ち絵。出どころ・確認結果は ~/outputs/butterfly-resident-placeholder-01/REPORT.md（候補2）。
+// 住民の立ち絵（3人とも同じ仮の絵。名札で見分ける。キャラクター素材は別のタスク）。仮の住民（名前のない一般住民）の立ち絵。出どころ・確認結果は ~/outputs/butterfly-resident-placeholder-01/REPORT.md（候補2）。
 // 足元の中央と頭頂〜足裏の大きさは画像を測った値。主人公と同じ高さ（WALK_HEIGHT）で、足元を住民の位置に合わせて描く
 const RESIDENT_ART = { key: "resident-a", footX: 560, footY: 1524, figureH: 1510 } as const;
 const LABEL_GAP = 12; // 頭頂と名札の間（論理座標）
@@ -31,7 +32,8 @@ class TownScene extends Phaser.Scene {
   private failed = false;
   private sprites = new Map<string, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse }>();
   private ring!: Phaser.GameObjects.Graphics;
-  private resident!: Phaser.GameObjects.Container;
+  private residents = new Map<ResidentSpotId, Phaser.GameObjects.Container>(); // 街の絵の上にいる住民（#31）
+  private shownResidents: readonly PlacedResident[] | null = null; // 描いている住民の並び（Session が置き直したら描き直す）
   private tags = new Map<SpotId, Tag>(); // 名札（人物より手前の層に置き、主人公に隠れないようにする）
   private greet: Tag | null = null; // 体験見本：近づくと住民の名札の上に出す「あ、こんにちは！」（名前とは別に出す）
   private parts = new Map<PartId, Phaser.GameObjects.Container>(); // 部品の印。依頼を受けてから拾うまでの間だけ見せる
@@ -78,11 +80,11 @@ class TownScene extends Phaser.Scene {
         img: this.add.image(0, 0, SPRITE_FILES[0]).setDepth(2).setVisible(false)
       });
     }
-    this.resident = makeResident(this, this.session);
     for (const id of PART_IDS) this.parts.set(id, makePart(this, id));
-    const r = this.session.resident;
-    this.tags.set("resident", makeTag(this, { x: r.pos.x, y: r.pos.y - WALK_HEIGHT - LABEL_GAP }, r.name));
-    if (this.hooks.encounter) {
+    this.syncResidents();
+    // 体験見本は住民1人だけ（その住民の頭上にあいさつを出す）
+    const r = this.session.residents[0];
+    if (this.hooks.encounter && r) {
       this.greet = makeTag(this, { x: r.pos.x, y: r.pos.y - WALK_HEIGHT - LABEL_GAP }, "あ、こんにちは！");
       this.talkIcon = this.add.graphics().setDepth(3.5).setVisible(false);
     }
@@ -115,13 +117,47 @@ class TownScene extends Phaser.Scene {
     const extra: Phaser.Geom.Rectangle[] = [];
     if (this.greet?.box.visible) extra.push(this.greet.label.getBounds());
     if (this.talkIcon?.visible) extra.push(this.talkIconBounds());
+    const rid = this.firstResident();
     for (const b of extra) {
-      const r = out.resident;
-      if (!r) break;
+      const r = rid && out[rid];
+      if (!rid || !r) break;
       const x = Math.min(r.x, b.x), y = Math.min(r.y, b.y);
-      out.resident = { x, y, w: Math.max(r.x + r.w, b.x + b.width) - x, h: Math.max(r.y + r.h, b.y + b.height) - y };
+      out[rid] = { x, y, w: Math.max(r.x + r.w, b.x + b.width) - x, h: Math.max(r.y + r.h, b.y + b.height) - y };
     }
     return out;
+  }
+
+  private firstResident(): ResidentSpotId | null {
+    const r = this.session.residents[0];
+    return r ? residentSpotId(r.key) : null;
+  }
+
+  // 住民を Session の並びに合わせる（#31）。時間帯を進めて場所が変わったら、その場で置き直す（歩く演出はしない）。
+  // いなくなった住民（家・場所不明）は絵と名札を消し、新しく来た住民は絵と名札を作る
+  private syncResidents() {
+    const list = this.session.residents;
+    this.shownResidents = list;
+    const keep = new Set(list.map((r) => residentSpotId(r.key)));
+    this.residents.forEach((c, id) => {
+      if (keep.has(id)) return;
+      c.destroy();
+      this.tags.get(id)?.box.destroy();
+      this.tags.delete(id);
+      this.residents.delete(id);
+    });
+    for (const r of list) {
+      const id = residentSpotId(r.key), at = { x: r.pos.x, y: r.pos.y - WALK_HEIGHT - LABEL_GAP };
+      const c = this.residents.get(id);
+      if (c) {
+        c.setPosition(r.pos.x, r.pos.y);
+        this.tags.get(id)!.box.setPosition(at.x, at.y);
+      } else {
+        this.residents.set(id, makeResident(this, r.pos));
+        const tag = makeTag(this, at, r.name);
+        this.tags.set(id, tag);
+        if (this.created) this.styleTag(id, tag);
+      }
+    }
   }
 
   // 部品は依頼を受けてから、拾うまでの間だけ置く（拾ったら消す）
@@ -146,18 +182,20 @@ class TownScene extends Phaser.Scene {
   private applyLook() {
     this.overheadK = 0;
     const all: [SpotId | "greet", Tag][] = [...this.tags.entries(), ...(this.greet ? [["greet", this.greet] as [ "greet", Tag ]] : [])];
-    all.forEach(([id, tag]) => {
-      const t = tag.label;
-      t.setResolution(this.zoom);
-      if (this.compact) {
-        t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2);
-        tag.plate.setVisible(true);
-        this.drawPlate(tag, this.session.nearSpot === id);
-      } else {
-        t.setFontSize(22).setPadding(10, 4, 10, 4);
-        tag.plate.clear().setVisible(false);
-      }
-    });
+    all.forEach(([id, tag]) => this.styleTag(id, tag));
+  }
+
+  private styleTag(id: SpotId | "greet", tag: Tag) {
+    const t = tag.label;
+    t.setResolution(this.zoom);
+    if (this.compact) {
+      t.setFontSize(15).setBackgroundColor("rgba(0,0,0,0)").setPadding(8, 2, 8, 2);
+      tag.plate.setVisible(true);
+      this.drawPlate(tag, this.session.nearSpot === id);
+    } else {
+      t.setFontSize(22).setPadding(10, 4, 10, 4);
+      tag.plate.clear().setVisible(false);
+    }
   }
 
   private drawPlate(tag: Tag, near: boolean) {
@@ -177,7 +215,8 @@ class TownScene extends Phaser.Scene {
   private overhead(now: number) {
     const s = this.session, cam = this.cameras.main;
     const k = cam.zoom * (this.scale.displaySize.width / this.scale.gameSize.width); // 画面上の px ÷ 論理座標
-    const name = this.tags.get("resident")!, g = this.greet!;
+    const rid = this.firstResident(), name = rid && this.tags.get(rid), g = this.greet;
+    if (!rid || !name || !g) return;
     if (k > 0 && Math.abs(k - this.overheadK) > 0.001) {
       this.overheadK = k;
       name.plate.clear().setVisible(false);
@@ -193,8 +232,8 @@ class TownScene extends Phaser.Scene {
         .fillTriangle(4 * u, -3 * u, 9 * u, -3 * u, 3 * u, 1 * u)
         .fillStyle(0x254b43, 1).fillCircle(5 * u, -8 * u, 1.3 * u).fillCircle(9 * u, -8 * u, 1.3 * u).fillCircle(13 * u, -8 * u, 1.3 * u);
     }
-    this.tags.forEach((tag, id) => tag.box.setVisible(id === "resident" && !s.isPaused));
-    const near = s.nearSpot === "resident";
+    this.tags.forEach((tag, id) => tag.box.setVisible(isResidentSpot(id) && !s.isPaused));
+    const near = s.nearSpot === rid;
     if (near && !this.wasNear) this.greetUntil = now + GREET_MS;
     this.wasNear = near;
     const left = this.greetUntil - now;
@@ -203,7 +242,7 @@ class TownScene extends Phaser.Scene {
     const nb = name.label.getBounds();
     // 近くにいる間は、名前の右に「話せる」アイコン（会話中は隠す）
     this.talkIcon!.setVisible(near && !s.isPaused).setPosition(nb.right - 4 / k, nb.bottom - 6 / k);
-    g.box.setVisible(show).setAlpha(Math.min(1, left / 300)).setPosition(s.resident.pos.x, nb.y + 2 / k);
+    g.box.setVisible(show).setAlpha(Math.min(1, left / 300)).setPosition(name.box.x, nb.y + 2 / k);
   }
 
   update(_time: number, delta: number) {
@@ -222,8 +261,9 @@ class TownScene extends Phaser.Scene {
       o.img.setOrigin(p.originX, p.originY).setScale(p.flip ? -k : k, k).setPosition(p.x, p.y).setAlpha(a.alpha).setDepth(2 + i / 10).setVisible(true);
       if (a.shadow) o.shadow.setPosition(a.shadow.x, a.shadow.y - 3).setSize(a.shadow.rx * 2, a.shadow.ry * 2).setVisible(true);
     });
-    // 仮の住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
-    this.resident.setDepth(s.resident.pos.y < sim.pos.y ? 1.5 : 2.9);
+    // 住民は足元の y で前後を決める（人物より奥なら人物の後ろに描く）。話せる距離では名札を強調する
+    if (this.shownResidents !== s.residents) this.syncResidents();
+    this.residents.forEach((c) => c.setDepth(c.y < sim.pos.y ? 1.5 : 2.9));
     if (this.shownFor !== s.repair) this.showParts();
     if (this.hooks.encounter) this.overhead(_time);
     else this.tags.forEach((tag, id) => {
@@ -236,9 +276,9 @@ class TownScene extends Phaser.Scene {
   }
 }
 
-// 仮の住民。立ち絵1枚と足元の影。前後関係は足元の y で主人公と比べて決める（update）
-function makeResident(scene: Phaser.Scene, s: Session): Phaser.GameObjects.Container {
-  const { pos } = s.resident, a = RESIDENT_ART;
+// 住民。立ち絵1枚と足元の影。前後関係は足元の y で主人公と比べて決める（update）
+function makeResident(scene: Phaser.Scene, pos: Point): Phaser.GameObjects.Container {
+  const a = RESIDENT_ART;
   const shadow = scene.add.ellipse(0, -3, 40, 14, 0x243e35, 0.27);
   const img = scene.add.image(0, 0, a.key);
   img.setOrigin(a.footX / img.width, a.footY / img.height).setScale(WALK_HEIGHT / a.figureH);

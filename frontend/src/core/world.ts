@@ -11,7 +11,11 @@ export type Town = {
   walkable: Poly; // 歩ける範囲。建物・水路・柵はこの外側にある
   foreground: Poly; // 人物の手前に重なる植栽。背景のこの範囲を人物の上に描き直す
   spawn: Point; // 街に出たときの足元の位置
+  // 住民の場所のうち、街の絵の上にあるもの（#31）。stands は住民の人数分の立ち位置（足元）。どこにいるかは Rails が決める
+  places: Record<string, Place>;
+  offstage: Record<string, string>; // 住民の場所のうち、街の絵の外にあるもの（家）と、その呼び方
 };
+export type Place = { name: string; stands: Point[] };
 
 export const WALK_RADIUS = 12; // 足元の円の半径
 export const DEAD_ZONE = 9; // 押している地点にこれより近ければ止まる
@@ -28,7 +32,7 @@ export function inside(x: number, y: number, poly: Poly): boolean {
 }
 
 // 足元の円（12方向の点）がすべて歩ける範囲に入っていれば立てる
-export function allowed(town: Town, x: number, y: number, r = WALK_RADIUS): boolean {
+export function allowed(town: Pick<Town, "walkable">, x: number, y: number, r = WALK_RADIUS): boolean {
   if (!inside(x, y, town.walkable)) return false;
   for (let i = 0; i < 12; i++) {
     const a = (i * Math.PI) / 6;

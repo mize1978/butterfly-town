@@ -35,6 +35,30 @@ class Api::V1::TownsControllerTest < ActionDispatch::IntegrationTest
     assert point_inside?(body["spawn"].values_at("x", "y"), body["walkable"])
   end
 
+  # #31：住民の場所（config/residents.yml の locations）は、街の絵の上の場所（places）か、絵の外の場所（offstage）の
+  # どちらか一方に必ずある。画面は location_key をこの表で引くだけで、知らない場所を推測で描かない
+  test "住民の場所は、街の絵の上（places）か絵の外（offstage）のどちらか一方にだけある" do
+    get "/api/v1/town"
+
+    body = response.parsed_body
+    places, offstage = body.fetch("places"), body.fetch("offstage")
+    assert_equal [], places.keys & offstage.keys
+    assert_equal ResidentCatalog.locations.sort, (places.keys + offstage.keys).sort
+    assert_equal({ "home_a" => "家", "home_b" => "家", "home_c" => "家" }, offstage)
+  end
+
+  test "絵の上の場所には、名前と、歩ける範囲の中にある住民3人分の立ち位置がある" do
+    get "/api/v1/town"
+
+    body = response.parsed_body
+    assert_equal({ "plaza" => "広場", "shop" => "店" }, body.fetch("places").transform_values { _1["name"] })
+    body.fetch("places").each do |key, place|
+      stands = place.fetch("stands")
+      assert_equal ResidentCatalog.keys.size, stands.size, key
+      stands.each { assert point_inside?(_1.values_at("x", "y"), body["walkable"]), "#{key}: #{_1}" }
+    end
+  end
+
   private
 
   # 偶奇判定（フロントエンドの core/world.ts の inside と同じ規則）

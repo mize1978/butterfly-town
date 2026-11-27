@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PlaythroughState } from "../api/playthrough";
 import type { TimeSlotResult } from "../api/time-slot";
 import { PlaythroughError } from "../api/playthrough";
-import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer } from "./time-slot";
+import { afterClose, aheadNote, budgetStop, describeEvent, nextStepLabel, outcomeNote, slotLabel, SlotAdvancer, statusLabel } from "./time-slot";
 
 const state = (timeIndex: number, status = "in_progress"): PlaythroughState => ({
   status, timeIndex, timeSlots: 15, festivalProgress: 0, interventionsLeft: 3, residents: []
@@ -121,5 +121,23 @@ describe("時間帯を進める（SlotAdvancer）", () => {
     expect(adv.sending).toBe(false);
     await expect(adv.advance(1)).resolves.toMatchObject({ ok: true, state: { timeIndex: 2 } });
     expect(send.mock.calls).toEqual([[1], [1]]);
+  });
+});
+
+// #31：情報欄の「時間帯・祭りの進み具合・介入の残り」。進み具合は Rails の値をそのまま出す（目標値・割合は画面で作らない）
+describe("街の情報欄（statusLabel）", () => {
+  const state = (o: Partial<PlaythroughState>): PlaythroughState =>
+    ({ status: "in_progress", timeIndex: 0, timeSlots: 15, festivalProgress: 0, interventionsLeft: 3, residents: [], ...o });
+
+  it("時間帯は1から数え、祭りの準備は Rails の festival_progress をそのまま出す", () => {
+    expect(statusLabel(state({ timeIndex: 2, festivalProgress: 2, interventionsLeft: 2 }))).toBe("時間帯 3/15・祭りの準備 2・介入 残り2");
+  });
+
+  it("始めたばかり（進み具合0）も0と出す", () => {
+    expect(statusLabel(state({}))).toBe("時間帯 1/15・祭りの準備 0・介入 残り3");
+  });
+
+  it("進み具合が大きくても、割合や上限を付けない", () => {
+    expect(statusLabel(state({ timeIndex: 14, festivalProgress: 23, interventionsLeft: 0 }))).toBe("時間帯 15/15・祭りの準備 23・介入 残り0");
   });
 });

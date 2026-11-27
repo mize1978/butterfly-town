@@ -4,8 +4,9 @@ import { WALK } from "../core/motion";
 import { Sim } from "../core/sim";
 import { walkerActors, type Actor } from "../core/walker";
 import type { Point, Town } from "../core/world";
-import { partSpot, partsInTown, SHOP, START, type Outcome, type Repair, type Spot, type SpotId } from "./errand";
-import { hitsResident, hitsTag, SAMPLE_RESIDENT, TALK_RANGE, type Rect, type SampleResident } from "./sample-resident";
+import { isResidentSpot, partSpot, partsInTown, residentSpotId, SHOP, START, type Outcome, type Repair, type ResidentSpotId, type Spot, type SpotId } from "./errand";
+import type { PlacedResident } from "./residents";
+import { hitsResident, hitsTag, TALK_RANGE, type Rect } from "./sample-resident";
 
 // 描いている名札の範囲（論理座標）。タップで選ぶ当たり判定に足す
 export type Tags = Partial<Record<SpotId, Rect>>;
@@ -25,7 +26,10 @@ export class Session {
   private walked = false; // 一度でも歩いたか（スマホの移動の説明を消す条件）
   private listeners = new Set<() => void>();
 
-  constructor(readonly town: Town, readonly resident: SampleResident = SAMPLE_RESIDENT) {
+  private residentList: readonly PlacedResident[]; // 街の絵の上にいる住民（Rails が確定した場所に置いたもの・#31）
+
+  constructor(readonly town: Town, residents: readonly PlacedResident[] = []) {
+    this.residentList = residents;
     this.sim = new Sim(town, WALK);
     this.view = viewTarget(town, this.sim.pos);
     this.near = this.measureNear();
@@ -70,29 +74,39 @@ export class Session {
   tapSpot(p: Point, tags: Tags = {}): boolean {
     if (this.paused) return false;
     if (!this.accepting) return true; // 閉じた直後のタップは、住民などを開き直さず、地面への移動にもしない（受け流す）
-    const hit = this.spots().find((s) => (s.id === "resident" ? hitsResident(this.resident, p, tags.resident) : hitsSpot(s, p, tags[s.id])));
+    const hit = this.spots().find((s) => (isResidentSpot(s.id) ? hitsResident(s, p, tags[s.id]) : hitsSpot(s, p, tags[s.id])));
     if (!hit) return false;
     if (hit.id === this.near) { this.setSelected(null); this.onOpen?.(hit.id); }
     else this.setSelected(hit.id);
     return true;
   }
   clearSelection() { this.setSelected(null); }
-  tapResident(p: Point, tag?: Rect): boolean { return this.tapSpot(p, { resident: tag }); }
   get selectedSpot() { return this.selected; }
-  get residentSelected() { return this.selected === "resident"; }
   get hasWalked() { return this.walked; }
   private setSelected(v: SpotId | null) { if (v !== this.selected) { this.selected = v; this.notify(); } }
   private notify() { this.listeners.forEach((fn) => fn()); }
 
-  // 近づいて使える場所（いま街にあるもの）。住民とスクーター修理はいつも、部品は依頼を受けて拾うまでの間だけ
+  // 街の住民（#31）。時間帯を進めて Rails の場所が変わったら、置き直した住民を受け取る（歩く演出はしない）。
+  // いなくなった住民の選択は外し、話せる相手を測り直す
+  get residents() { return this.residentList; }
+  residentOf(id: ResidentSpotId): PlacedResident | null { return this.residentList.find((r) => residentSpotId(r.key) === id) ?? null; }
+  setResidents(residents: readonly PlacedResident[]) {
+    this.residentList = residents;
+    if (this.selected && !this.spots().some((s) => s.id === this.selected)) this.selected = null;
+    this.notify();
+    this.updateNear();
+  }
+
+  // 近づいて使える場所（いま街にあるもの）。住民は街の絵の上にいる間、スクーター修理はいつも、部品は依頼を受けて拾うまでの間だけ。
+  // 住民の当たり範囲は体の箱（hitsResident）なので、hit は使わない
   spots(): Spot[] {
-    const r: Spot = { id: "resident", name: this.resident.name, pos: this.resident.pos, hit: { x: 0, y: 0, w: 0, h: 0 } };
-    return [r, SHOP, ...partsInTown(this.repairState).map(partSpot)];
+    const rs: Spot[] = this.residentList.map((r) => ({ id: residentSpotId(r.key), name: r.name, pos: r.pos, hit: { x: 0, y: 0, w: 0, h: 0 } }));
+    return [...rs, SHOP, ...partsInTown(this.repairState).map(partSpot)];
   }
 
   // 話せる（調べられる）距離にいる場所。変わったときだけ subscribe の相手に知らせる（React の useSyncExternalStore 用）
   get nearSpot() { return this.near; }
-  get nearResident() { return this.near === "resident"; }
+  get nearResident() { return !!this.near && isResidentSpot(this.near); }
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   private measureNear(): SpotId | null {
     const p = this.sim.pos;

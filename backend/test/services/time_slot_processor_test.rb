@@ -38,23 +38,25 @@ class TimeSlotProcessorTest < ActiveSupport::TestCase
 
   # --- 1時間帯の確定 ---
 
-  test "朝（時間帯0）を確定すると、日課の場所のまま次の時間帯へ進む。誰も会わないので判断は使わない" do
+  test "朝（時間帯0）を確定すると次の時間帯へ進み、住民は昼の日課の場所へ動く。朝は誰も会わないので判断は使わない" do
     spy = SpyResponder.new
+    assert_equal({ "a" => "plaza", "b" => "home_b", "c" => "shop" }, locations, "朝の場所")
     result = confirm(0, responder: spy)
     assert_equal :confirmed, result.status
     assert_equal 1, @pt.reload.time_index
-    assert_equal({ "a" => "plaza", "b" => "home_b", "c" => "shop" }, locations)
+    assert_equal({ "a" => "plaza", "b" => "shop", "c" => "plaza" }, locations, "確定した後は、次の時間帯（昼）の場所（#31）")
     assert_empty spy.asked, "同じ場所に誰もいない住民は、日課だけで判断を使わない"
     assert_equal "confirmed", TimeSlotRun.find_by!(playthrough: @pt, time_index: 0).status
   end
 
-  test "昼（時間帯1）は日課で動き、同じ場所で会った住民だけが判断し、成立した行動が出来事になる" do
+  test "昼（時間帯1）は日課の場所で、同じ場所で会った住民だけが判断し、成立した行動が出来事になる" do
     confirm(0)
     spy = SpyResponder.new
     version = @pt.reload.state_version
+    assert_equal({ "a" => "plaza", "b" => "shop", "c" => "plaza" }, locations, "昼の場所（確定する前から見えている）")
     result = confirm(1, responder: spy)
     assert_equal :confirmed, result.status
-    assert_equal({ "a" => "plaza", "b" => "shop", "c" => "plaza" }, locations)
+    assert_equal({ "a" => "home_a", "b" => "home_b", "c" => "home_c" }, locations, "確定した後は、次の時間帯（夜）の場所（#31）")
     assert_equal %w[a c], spy.asked.sort, "広場で会った a と c だけが判断する（b は店に1人）"
     events = @pt.world_events.where(time_index: 1).order(:actor_key)
     assert_equal [ [ "consulted", "a", "c", nil ], [ "told", "c", "a", "e2" ] ],
@@ -119,6 +121,7 @@ class TimeSlotProcessorTest < ActiveSupport::TestCase
 
   test "判断の間に状態が変わったら（古い状態から作った案）反映せず、版の不一致で中断する。やり直すと attempt が増える" do
     confirm(0)
+    before = locations
     meddle = SpyResponder.new { Playthrough.where(id: @pt.id).update_all("state_version = state_version + 1") }
     result = confirm(1, responder: meddle)
     assert_equal :suspended, result.status
@@ -126,7 +129,7 @@ class TimeSlotProcessorTest < ActiveSupport::TestCase
     assert_equal [ "suspended", "version_mismatch", 1 ], [ run.status, run.suspend_reason, run.attempt ]
     assert_empty @pt.world_events.where(time_index: 1), "古い案は出来事にしない"
     assert_equal 1, @pt.reload.time_index, "時間帯は進めない"
-    assert_equal({ "a" => "plaza", "b" => "home_b", "c" => "shop" }, locations, "日課の移動も反映しない")
+    assert_equal before, locations, "場所も動かさない（次の時間帯へ進んでいない）"
 
     result = confirm(1)
     assert_equal :confirmed, result.status

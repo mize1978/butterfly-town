@@ -3,9 +3,13 @@ import { TOWN } from "../test/town";
 import { allowed } from "../core/world";
 import { SAMPLE_RESIDENT, TALK_RANGE } from "./sample-resident";
 import { RESUME_GUARD, Session } from "./session";
+import { SHOP } from "./errand";
 
 const run = (s: Session, sec: number, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) s.tick(dt); };
 const east = { x: TOWN.spawn.x + 300, y: TOWN.spawn.y };
+// 住民1人の街（距離・タップの決まりを確かめる。位置は以前の仮の住民と同じ）
+const ONE = { key: "a", name: "住民a", pos: SAMPLE_RESIDENT.pos };
+const one = () => new Session(TOWN, [ONE]);
 
 describe("メニューを開いている間の街", () => {
   it("開くと歩いている途中でもその場で止まり、それ以上進まない", () => {
@@ -56,11 +60,11 @@ describe("仮の住民に話しかけられる距離", () => {
   it("住民は歩ける範囲にいて、出現位置からは少し歩かないと届かない", () => {
     expect(allowed(TOWN, r.x, r.y)).toBe(true);
     expect(Math.hypot(r.x - TOWN.spawn.x, r.y - TOWN.spawn.y)).toBeGreaterThan(TALK_RANGE);
-    expect(new Session(TOWN).nearResident).toBe(false);
+    expect(one().nearResident).toBe(false);
   });
 
   it("住民の方へ歩くと近くにいる状態になり、知らせは変わったときに1回だけ届く", () => {
-    const s = new Session(TOWN);
+    const s = one();
     // 知らせは「歩いた」の合図でも届くので、近さが変わった回数だけを数える
     let changes = 0, last = s.nearResident;
     s.subscribe(() => { if (s.nearResident !== last) { changes++; last = s.nearResident; } });
@@ -71,7 +75,7 @@ describe("仮の住民に話しかけられる距離", () => {
   });
 
   it("会話中（止めている間）は住民の近くから動かず、閉じると同じ位置から続く", () => {
-    const s = new Session(TOWN);
+    const s = one();
     s.press(r);
     run(s, 3);
     s.release();
@@ -90,10 +94,10 @@ describe("スマホで住民をタップしたとき", () => {
   const onResident = { x: SAMPLE_RESIDENT.pos.x, y: SAMPLE_RESIDENT.pos.y - 80 };
 
   it("住民に当たったら選ぶだけで、主人公は歩き出さない", () => {
-    const s = new Session(TOWN);
-    expect(s.tapResident(onResident)).toBe(true);
+    const s = one();
+    expect(s.tapSpot(onResident)).toBe(true);
     run(s, 1);
-    expect(s.residentSelected).toBe(true);
+    expect((s.selectedSpot === "resident-a")).toBe(true);
     expect(s.sim.pos).toEqual(TOWN.spawn);
     expect(s.sim.target).toBeNull();
   });
@@ -106,8 +110,8 @@ describe("スマホで住民をタップしたとき", () => {
     it(`${label}：名札の中央・左端・右端のどこを押しても選べ、歩き出さない`, () => {
       const midY = t.y + t.h / 2;
       for (const x of [R.x, t.x + 1, t.x + t.w - 1]) {
-        const s = new Session(TOWN);
-        expect(s.tapResident({ x, y: midY }, t)).toBe(true);
+        const s = one();
+        expect(s.tapSpot({ x, y: midY }, { "resident-a": t })).toBe(true);
         run(s, 0.5);
         expect(s.sim.pos).toEqual(TOWN.spawn);
         expect(s.sim.target).toBeNull();
@@ -115,29 +119,29 @@ describe("スマホで住民をタップしたとき", () => {
     });
 
     it(`${label}：名札から少し外れた所は選ばない（地面への移動になる）`, () => {
-      const s = new Session(TOWN);
-      expect(s.tapResident({ x: t.x + t.w + 20, y: t.y + t.h / 2 }, t)).toBe(false);
-      expect(s.tapResident({ x: R.x, y: t.y - 20 }, t)).toBe(false);
+      const s = one();
+      expect(s.tapSpot({ x: t.x + t.w + 20, y: t.y + t.h / 2 }, { "resident-a": t })).toBe(false);
+      expect(s.tapSpot({ x: R.x, y: t.y - 20 }, { "resident-a": t })).toBe(false);
     });
   }
 
   it("住民から外れたタップは選ばない（そのあと地面を押せば歩く）", () => {
-    const s = new Session(TOWN);
-    expect(s.tapResident(east)).toBe(false);
-    expect(s.residentSelected).toBe(false);
+    const s = one();
+    expect(s.tapSpot(east)).toBe(false);
+    expect((s.selectedSpot === "resident-a")).toBe(false);
   });
 
   it("地面を押すと選択が外れ、話せる距離を離れても外れる", () => {
-    const s = new Session(TOWN);
-    s.tapResident(onResident);
+    const s = one();
+    s.tapSpot(onResident);
     s.press(east);
-    expect(s.residentSelected).toBe(false);
+    expect((s.selectedSpot === "resident-a")).toBe(false);
   });
 
   it("止めている間（メニュー・会話中）は選ばない", () => {
-    const s = new Session(TOWN);
+    const s = one();
     s.pause();
-    expect(s.tapResident(onResident)).toBe(false);
+    expect(s.tapSpot(onResident)).toBe(false);
   });
 
   it("話せる距離は今までどおり 120", () => {
@@ -182,5 +186,53 @@ describe("会話やメニューを閉じた直後の入力（閉じるボタン�
     s.goTo(east);
     run(s, 0.5);
     expect(s.sim.pos.x).toBeGreaterThan(x);
+  });
+});
+
+// #31：仮の住民1人を、Rails が返した3人に置き換える。場所が変わったら（時間帯を進めたら）置き直す
+describe("街の3人の住民（setResidents）", () => {
+  const near = { x: TOWN.spawn.x + 50, y: TOWN.spawn.y };
+  const away = { x: TOWN.spawn.x + 400, y: TOWN.spawn.y };
+  const resident = (key: string, pos: { x: number; y: number }) => ({ key, name: `住民${key}`, pos });
+  const ids = (s: Session) => s.spots().map((x) => x.id).filter((id) => id.startsWith("resident"));
+
+  it("受け取った住民だけが話せる場所になり、id は住民ごとに分かれる", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("a", away), resident("b", near)]);
+    expect(ids(s)).toEqual(["resident-a", "resident-b"]);
+    s.setResidents([]);
+    expect(ids(s)).toEqual([]);
+  });
+
+  it("近くの住民をタップすると、その住民の会話を開く", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("a", away), resident("b", near)]);
+    const opened: string[] = [];
+    s.onOpen = (id) => opened.push(id);
+    expect(s.nearSpot).toBe("resident-b");
+    expect(s.tapSpot({ x: near.x, y: near.y - 100 })).toBe(true);
+    expect(opened).toEqual(["resident-b"]);
+  });
+
+  it("近くにいた住民が別の場所へ移ったら、話せる相手と選択から外れる", () => {
+    const s = new Session(TOWN);
+    s.setResidents([resident("b", near)]);
+    expect(s.nearSpot).toBe("resident-b");
+    s.setResidents([resident("b", away)]);
+    expect(s.nearSpot).toBeNull();
+    expect(s.selectedSpot).toBeNull();
+  });
+
+  it("店先に3人いても、店の絵と住民をそれぞれタップで選べる", () => {
+    const s = new Session(TOWN);
+    const stands = TOWN.places?.shop?.stands ?? [];
+    expect(stands).toHaveLength(3);
+    s.setResidents(["a", "b", "c"].map((k, i) => resident(k, stands[i])));
+    expect(s.tapSpot({ x: SHOP.pos.x, y: SHOP.pos.y - 140 })).toBe(true);
+    expect(s.selectedSpot).toBe("shop");
+    ["a", "b", "c"].forEach((k, i) => {
+      expect(s.tapSpot({ x: stands[i].x, y: stands[i].y - 100 })).toBe(true);
+      expect(s.selectedSpot).toBe(`resident-${k}`);
+    });
   });
 });

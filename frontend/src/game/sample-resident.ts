@@ -1,4 +1,5 @@
-// 会話UIの試作用に、街へ1人だけ置く仮の住民と、固定のサンプル会話。
+// 住民の固定のサンプル会話（話題を選ぶ会話は #32）と、住民に話しかける距離・タップの当たり範囲。
+// SAMPLE_RESIDENT は体験見本（encounter.html）に1人だけ置く仮の住民。本編の街の住民は Rails の3人（residents.ts）。
 // AIには接続していない。住民の判断・記憶・保存は行わず、何度話しかけても同じ文を順に出すだけ
 import type { Point } from "../core/world";
 
@@ -14,7 +15,7 @@ export const TALK_RANGE = 120;
 export type Rect = { x: number; y: number; w: number; h: number };
 export const RESIDENT_HIT = { halfW: 40, top: 210, bottom: 16 } as const;
 export const TAG_PAD = 6;
-export function hitsResident(r: SampleResident, p: Point, tag?: Rect): boolean {
+export function hitsResident(r: { pos: Point }, p: Point, tag?: Rect): boolean {
   const body = Math.abs(p.x - r.pos.x) <= RESIDENT_HIT.halfW && p.y >= r.pos.y - RESIDENT_HIT.top && p.y <= r.pos.y + RESIDENT_HIT.bottom;
   return body || hitsTag(p, tag);
 }

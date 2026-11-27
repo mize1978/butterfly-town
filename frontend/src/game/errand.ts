@@ -22,10 +22,13 @@ export const PARTS: Record<PartId, PartDef> = {
 // 街の中で近づいて使える場所。hit はタップで選ぶ範囲（pos からの相対・論理座標）。
 // range は話せる（調べられる）距離で、省略すると住民と同じ TALK_RANGE
 export type PartSpotId = `part-${PartId}`;
-export type SpotId = "resident" | "shop" | PartSpotId;
+export type ResidentSpotId = `resident-${string}`; // 住民（#31）。住民キーごとに分ける
+export type SpotId = ResidentSpotId | "shop" | PartSpotId;
 export type Spot = { id: SpotId; name: string; pos: Point; hit: Rect; range?: number };
 export const partSpotId = (id: PartId): PartSpotId => `part-${id}`;
 export const partOfSpot = (id: SpotId): PartId | null => (id.startsWith("part-") ? (id.slice(5) as PartId) : null);
+export const residentSpotId = (key: string): ResidentSpotId => `resident-${key}`;
+export const isResidentSpot = (id: SpotId): id is ResidentSpotId => id.startsWith("resident-");
 
 // スクーター修理（の店）：街の絵の左上にある作業場の前（店先に修理中のスクーターが描かれている）。pos は店先の地面（話せる距離はここから測る）、hit は店先の絵の範囲。
 // 店先は横に広い（約220）ので、話せる距離は住民より少し広い 150（店先の右端の前に立っても話せる）

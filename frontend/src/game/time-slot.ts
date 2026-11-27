@@ -8,6 +8,11 @@ const PARTS = ["朝", "昼", "夜"] as const;
 const day = (i: number) => Math.floor(i / 3) + 1;
 export const slotLabel = (i: number) => `${day(i)}日目の${PARTS[i % 3]}`;
 
+// 街の情報欄（#31）：「時間帯 3/15・祭りの準備 2・介入 残り2」。値はどれも Rails が確定した状態のまま出す。
+// 祭りの進み具合は目標値・割合を付けない（勝敗のしきい値は Rails が決める・#34）
+export const statusLabel = (s: Pick<PlaythroughState, "timeIndex" | "timeSlots" | "festivalProgress" | "interventionsLeft">) =>
+  `時間帯 ${s.timeIndex + 1}/${s.timeSlots}・祭りの準備 ${s.festivalProgress}・介入 残り${s.interventionsLeft}`;
+
 // ボタンに添える「いま → 次」。日が変わるときは日付も書く
 export function nextStepLabel(s: PlaythroughState): string {
   const i = s.timeIndex;

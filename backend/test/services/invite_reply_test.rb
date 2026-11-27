@@ -117,7 +117,8 @@ class InviteReplyTest < ActiveSupport::TestCase
 
   test "昼に移動を決めると、その日の夜は家・翌日の朝と昼は移動先・翌日の夜は家にいる" do
     script = Script.new([ 1, "a" ] => { "action_type" => "move", "target" => nil, "params" => { "to" => "shop" }, "reason" => "x" })
-    seen = (0..5).to_h { |t| confirm(script, t); [ t, resident("a").location_key ] }
+    # 時間帯 t の場所＝ t を確定する前に見えている場所（#31：確定したら次の時間帯の場所へ動く）
+    seen = (0..5).to_h { |t| at = resident("a").location_key; confirm(script, t); [ t, at ] }
     assert_equal({ 0 => "plaza", 1 => "plaza", 2 => "home_a", 3 => "shop", 4 => "shop", 5 => "home_a" }, seen)
     assert_equal({ "type" => "move", "to" => "shop", "from" => 3, "until" => 4 }, resident("a").current_plan)
   end
