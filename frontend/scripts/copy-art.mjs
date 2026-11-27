@@ -3,7 +3,7 @@
 // 使うのは街の背景（修理屋の店先にスクーターを描き足した版。出どころ・新旧比較は SHOP_SRC の1つ上の REPORT.md）と、女の子・アイボリーの歩行シート（横・斜め前・斜め後ろ・正面）と待機姿勢（5方向）、
 // 仮の住民（名前のない一般住民）の立ち絵1枚（出どころ・確認結果は RES_SRC の1つ上の REPORT.md）。
 // 出典は描画試作（feature/walk-ride-spike の render-spike/scripts/copy-art.mjs）と同じで、複製先の名前も同じ。
-// 使い方：npm run art   （複製元は ART_SRC・DIAG_SRC・FRONT_SRC・RES_SRC・SHOP_SRC で変更可）
+// 使い方：npm run art   （複製元は ART_SRC・DIAG_SRC・FRONT_SRC・RES_SRC・SHOP_SRC・SIDE_SRC で変更可）
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -14,10 +14,12 @@ const DIAG_SRC = process.env.DIAG_SRC || join(homedir(), "outputs/butterfly-diag
 const FRONT_SRC = process.env.FRONT_SRC || join(homedir(), "outputs/butterfly-direction-study-01/assets");
 const RES_SRC = process.env.RES_SRC || join(homedir(), "outputs/butterfly-resident-placeholder-01/assets");
 const SHOP_SRC = process.env.SHOP_SRC || join(homedir(), "outputs/butterfly-town-scooter-shop-01/assets");
+// 横向きの歩行シート：コマ1・3（跳ねポーズ）を通過ポーズに描き直した版。コマ0・2は元の絵と画素まで同じ（元の素材は ART_SRC に残す）
+const SIDE_SRC = process.env.SIDE_SRC || join(homedir(), "outputs/walk-redraw-20261127");
 const DEST = new URL("../public/art/", import.meta.url).pathname;
 // [複製元のフォルダ, 元のファイル名, 複製先の名前]
 const FILES = [
-  [SHOP_SRC, "town-scooter-shop", "town"], [SRC, "girl-walk-base"],
+  [SHOP_SRC, "town-scooter-shop", "town"], [SIDE_SRC, "girl-walk-redraw-v2", "girl-walk-base"],
   [DIAG_SRC, "girl-walk-se-base"], [DIAG_SRC, "girl-walk-ne-base"],
   [FRONT_SRC, "girl-walk-s-ivory-6", "girl-walk-s-base"],
   ...["s", "se", "e", "ne", "n"].map((d) => [FRONT_SRC, `girl-idle-${d}-ivory`, `girl-idle-${d}-base`]),
